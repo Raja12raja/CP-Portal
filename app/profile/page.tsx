@@ -13,6 +13,15 @@ interface UserPreferences {
   reminders: boolean;
 }
 
+interface Friend {
+  clerkId: string;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  imageUrl?: string;
+  email: string;
+}
+
 export default function Profile() {
   const { user } = useUser()
   const [preferences, setPreferences] = useState<UserPreferences>({
@@ -27,9 +36,19 @@ export default function Profile() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [userData, setUserData] = useState<any>(null)
+  
+  // Friends state
+  const [friends, setFriends] = useState<Friend[]>([])
+  const [sentRequests, setSentRequests] = useState<Friend[]>([])
+  const [receivedRequests, setReceivedRequests] = useState<Friend[]>([])
+  const [searchEmail, setSearchEmail] = useState('')
+  const [searchResult, setSearchResult] = useState<Friend | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [friendsLoading, setFriendsLoading] = useState(false)
 
   useEffect(() => {
     fetchUserData()
+    fetchFriendsData()
   }, [])
 
   const fetchUserData = async () => {
@@ -60,6 +79,26 @@ export default function Profile() {
       setMessage('Error loading user data')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchFriendsData = async () => {
+    try {
+      setFriendsLoading(true)
+      const response = await fetch('/api/friends')
+      
+      if (response.ok) {
+        const data = await response.json()
+        setFriends(data.data.friends || [])
+        setSentRequests(data.data.sentRequests || [])
+        setReceivedRequests(data.data.receivedRequests || [])
+      } else {
+        console.error('Failed to fetch friends data:', response.status)
+      }
+    } catch (error) {
+      console.error('Error fetching friends data:', error)
+    } finally {
+      setFriendsLoading(false)
     }
   }
 
@@ -145,6 +184,98 @@ export default function Profile() {
     setMessage('Reset to default preferences')
   }
 
+  // Friends functions
+  const searchUser = async () => {
+    if (!searchEmail.trim()) return
+    
+    try {
+      setSearching(true)
+      setSearchResult(null)
+      
+      const response = await fetch(`/api/users/search?email=${encodeURIComponent(searchEmail)}`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        setSearchResult(data.data)
+      } else {
+        const errorData = await response.json()
+        setMessage(errorData.error || 'Failed to search user')
+      }
+    } catch (error) {
+      console.error('Error searching user:', error)
+      setMessage('Error searching user')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const sendFriendRequest = async (targetUserId: string) => {
+    try {
+      const response = await fetch('/api/friends', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ targetUserId }),
+      })
+
+      if (response.ok) {
+        setMessage('Friend request sent successfully!')
+        setSearchResult(null)
+        setSearchEmail('')
+        await fetchFriendsData()
+      } else {
+        const errorData = await response.json()
+        setMessage(errorData.error || 'Failed to send friend request')
+      }
+    } catch (error) {
+      console.error('Error sending friend request:', error)
+      setMessage('Error sending friend request')
+    }
+  }
+
+  const handleFriendRequest = async (targetUserId: string, action: 'accept' | 'decline') => {
+    try {
+      const response = await fetch('/api/friends/requests', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ targetUserId, action }),
+      })
+
+      if (response.ok) {
+        setMessage(`Friend request ${action}ed successfully!`)
+        await fetchFriendsData()
+      } else {
+        const errorData = await response.json()
+        setMessage(errorData.error || `Failed to ${action} friend request`)
+      }
+    } catch (error) {
+      console.error(`Error ${action}ing friend request:`, error)
+      setMessage(`Error ${action}ing friend request`)
+    }
+  }
+
+  const cancelFriendRequest = async (targetUserId: string) => {
+    try {
+      const response = await fetch(`/api/friends/requests?targetUserId=${targetUserId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setMessage('Friend request cancelled successfully!')
+        await fetchFriendsData()
+      } else {
+        const errorData = await response.json()
+        setMessage(errorData.error || 'Failed to cancel friend request')
+      }
+    } catch (error) {
+      console.error('Error cancelling friend request:', error)
+      setMessage('Error cancelling friend request')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -178,7 +309,7 @@ export default function Profile() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* User Profile */}
           <div className="bg-white rounded-lg shadow">
             <div className="px-6 py-4 border-b border-gray-200">
@@ -240,6 +371,171 @@ export default function Profile() {
                   <p className="text-gray-600">Loading user information...</p>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Friends Section */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-medium text-gray-900">Friends</h2>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Add Friend */}
+              <div>
+                <h3 className="text-md font-medium text-gray-900 mb-4">Add Friend</h3>
+                <div className="space-y-3">
+                  <div className="flex space-x-2">
+                    <input
+                      type="email"
+                      placeholder="Enter friend's email"
+                      value={searchEmail}
+                      onChange={(e) => setSearchEmail(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={searchUser}
+                      disabled={searching || !searchEmail.trim()}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {searching ? 'Searching...' : 'Search'}
+                    </button>
+                  </div>
+                  
+                  {searchResult && (
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <img
+                          src={searchResult.imageUrl || '/default-avatar.png'}
+                          alt="Profile"
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">
+                            {searchResult.firstName} {searchResult.lastName}
+                          </p>
+                          <p className="text-sm text-gray-600">{searchResult.email}</p>
+                        </div>
+                        <button
+                          onClick={() => sendFriendRequest(searchResult.clerkId)}
+                          className="px-3 py-1 bg-green-600 text-white text-sm rounded-md hover:bg-green-700"
+                        >
+                          Add Friend
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Friend Requests */}
+              {receivedRequests.length > 0 && (
+                <div>
+                  <h3 className="text-md font-medium text-gray-900 mb-4">Friend Requests ({receivedRequests.length})</h3>
+                  <div className="space-y-3">
+                    {receivedRequests.map((request) => (
+                      <div key={request.clerkId} className="p-3 bg-blue-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <img
+                            src={request.imageUrl || '/default-avatar.png'}
+                            alt="Profile"
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">
+                              {request.firstName} {request.lastName}
+                            </p>
+                            <p className="text-sm text-gray-600">{request.email}</p>
+                          </div>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleFriendRequest(request.clerkId, 'accept')}
+                              className="px-2 py-1 bg-green-600 text-white text-xs rounded-md hover:bg-green-700"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleFriendRequest(request.clerkId, 'decline')}
+                              className="px-2 py-1 bg-red-600 text-white text-xs rounded-md hover:bg-red-700"
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sent Requests */}
+              {sentRequests.length > 0 && (
+                <div>
+                  <h3 className="text-md font-medium text-gray-900 mb-4">Sent Requests ({sentRequests.length})</h3>
+                  <div className="space-y-3">
+                    {sentRequests.map((request) => (
+                      <div key={request.clerkId} className="p-3 bg-yellow-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <img
+                            src={request.imageUrl || '/default-avatar.png'}
+                            alt="Profile"
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">
+                              {request.firstName} {request.lastName}
+                            </p>
+                            <p className="text-sm text-gray-600">{request.email}</p>
+                          </div>
+                          <button
+                            onClick={() => cancelFriendRequest(request.clerkId)}
+                            className="px-2 py-1 bg-gray-600 text-white text-xs rounded-md hover:bg-gray-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Friends List */}
+              <div>
+                <h3 className="text-md font-medium text-gray-900 mb-4">My Friends ({friends.length})</h3>
+                {friendsLoading ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                  </div>
+                ) : friends.length > 0 ? (
+                  <div className="space-y-3">
+                    {friends.map((friend) => (
+                      <div key={friend.clerkId} className="p-3 bg-green-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <img
+                            src={friend.imageUrl || '/default-avatar.png'}
+                            alt="Profile"
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">
+                              {friend.firstName} {friend.lastName}
+                            </p>
+                            <p className="text-sm text-gray-600">{friend.email}</p>
+                          </div>
+                          <Link
+                            href={`/profile/${friend.clerkId}`}
+                            className="px-2 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700"
+                          >
+                            View Profile
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-600 text-sm">No friends yet. Search for users to add them as friends!</p>
+                )}
+              </div>
             </div>
           </div>
 

@@ -40,6 +40,11 @@ export async function POST(request: NextRequest) {
       lastName: user?.lastName || '',
       username: user?.username || '',
       imageUrl: user?.imageUrl || '',
+      friends: [],
+      friendRequests: {
+        sent: [],
+        received: []
+      }
     };
     
     console.log('Saving user data:', userDataToSave);

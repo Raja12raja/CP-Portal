@@ -74,6 +74,11 @@ export async function POST(request: NextRequest) {
             lastName: last_name,
             username,
             imageUrl: image_url,
+            friends: [],
+            friendRequests: {
+              sent: [],
+              received: []
+            }
           },
           { upsert: true, new: true }
         );

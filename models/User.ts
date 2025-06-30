@@ -15,6 +15,11 @@ export interface IUser extends Document {
     emailNotifications: boolean;
     reminders: boolean;
   };
+  friends: string[]; // Array of clerkIds of friends
+  friendRequests: {
+    sent: string[]; // Array of clerkIds to whom friend requests were sent
+    received: string[]; // Array of clerkIds from whom friend requests were received
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,6 +75,21 @@ const UserSchema: Schema = new Schema({
       default: true,
     },
   },
+  friends: [{
+    type: String,
+    ref: 'User',
+    index: true,
+  }],
+  friendRequests: {
+    sent: [{
+      type: String,
+      ref: 'User',
+    }],
+    received: [{
+      type: String,
+      ref: 'User',
+    }],
+  },
 }, {
   timestamps: true,
 });
@@ -77,5 +97,6 @@ const UserSchema: Schema = new Schema({
 // Index for efficient querying
 UserSchema.index({ clerkId: 1 });
 UserSchema.index({ email: 1 });
+UserSchema.index({ friends: 1 });
 
 export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema); 
