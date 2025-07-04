@@ -17,8 +17,11 @@ export default function Home() {
               <h1 className="text-xl font-bold text-gray-900">CP Portal</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <Link href="/dashboard">
-                <Button variant="outline">Dashboard</Button>
+              <Link href="/contests">
+                <Button variant="outline">Contests</Button>
+              </Link>
+              <Link href="/problems">
+                <Button variant="outline">Problems</Button>
               </Link>
               {isSignedIn ? (
                 <SignOutButton>
@@ -47,11 +50,18 @@ export default function Home() {
           </p>
           <div className="mt-10 flex justify-center space-x-4">
             {isSignedIn ? (
-              <Link href="/dashboard">
+            <>
+              <Link href="/contests">
                 <Button size="lg" className="px-8">
-                  Go to Dashboard
+                  Go to Contests
                 </Button>
               </Link>
+              <Link href="/problems">
+              <Button size="lg" className="px-8">
+                Go to problems
+              </Button>
+            </Link>
+            </>
             ) : (
               <>
                 <Link href="/sign-up">
@@ -59,7 +69,7 @@ export default function Home() {
                     Get Started
                   </Button>
                 </Link>
-                <Link href="/dashboard">
+                <Link href="/contests">
                   <Button variant="outline" size="lg" className="px-8">
                     View Contests
                   </Button>

@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { ContestFetcher } from './contestFetcher';
+import { ProblemFetcher } from './problemFetcher';
 
 class CronJobService {
   private static instance: CronJobService;
@@ -29,14 +30,15 @@ class CronJobService {
 
     // Update contests every minute
     this.task = cron.schedule('* * * * *', async () => {
-      console.log('=== Cron Job: Updating contests ===');
+      console.log('=== Cron Job: Updating  ===');
       console.log('Time:', new Date().toISOString());
       
       try {
         await ContestFetcher.fetchAllContests();
-        console.log('=== Cron Job: Contest update completed successfully ===');
+        await ProblemFetcher.fetchAllProblems();
+        console.log('=== Cron Job: update completed successfully ===');
       } catch (error) {
-        console.error('=== Cron Job: Error updating contests ===');
+        console.error('=== Cron Job: Error updating  ===');
         console.error('Error:', error);
       }
     }, {
@@ -47,7 +49,6 @@ class CronJobService {
     this.isRunning = true;
     console.log('Cron job service started successfully');
     console.log('Scheduled tasks:');
-    console.log('- Contest updates every minute');
     console.log('Task created:', !!this.task);
   }
 

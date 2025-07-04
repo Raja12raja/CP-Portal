@@ -27,26 +27,26 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== Manual Contest Fetch Test ===');
+    console.log('=== Manual Fetch Test ===');
     console.log('Time:', new Date().toISOString());
     
     // Manually trigger contest fetching
     await ContestFetcher.fetchAllContests();
     
-    console.log('=== Manual Contest Fetch Completed ===');
+    console.log('=== Manual Fetch Completed ===');
     
     return NextResponse.json({
       success: true,
-      message: 'Manual contest fetch completed successfully',
+      message: 'Manual fetch completed successfully',
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('=== Manual Contest Fetch Error ===');
+    console.error('=== Manual Fetch Error ===');
     console.error('Error:', error);
     return NextResponse.json(
       { 
         success: false, 
-        error: 'Failed to fetch contests manually',
+        error: 'Failed to fetch manually',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }

@@ -291,6 +291,9 @@ export default function Dashboard() {
               <Link href="/" className="text-xl font-semibold text-gray-900">CP Portal Dashboard</Link>
             </div>
             <div className="flex items-center space-x-4">
+              <Link href="/problems" className="text-gray-700 hover:text-gray-900">
+                Problems
+              </Link>
               <Link href="/profile" className="text-gray-700 hover:text-gray-900">
                 Profile
               </Link>
