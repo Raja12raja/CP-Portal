@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { UserProfile, useUser } from '@clerk/nextjs'
 import Link from 'next/link'
+import { Moon, Sun } from 'lucide-react'
 
 interface UserPreferences {
   codeforces: boolean;
@@ -24,6 +25,7 @@ interface Friend {
 
 export default function Profile() {
   const { user } = useUser()
+  const [darkMode, setDarkMode] = useState(false)
   const [preferences, setPreferences] = useState<UserPreferences>({
     codeforces: true,
     codechef: true,
@@ -36,7 +38,7 @@ export default function Profile() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [userData, setUserData] = useState<any>(null)
-  
+
   // Friends state
   const [friends, setFriends] = useState<Friend[]>([])
   const [sentRequests, setSentRequests] = useState<Friend[]>([])
@@ -45,6 +47,19 @@ export default function Profile() {
   const [searchResult, setSearchResult] = useState<Friend | null>(null)
   const [searching, setSearching] = useState(false)
   const [friendsLoading, setFriendsLoading] = useState(false)
+
+  // Load dark mode preference from localStorage on mount
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('darkMode')
+    if (savedDarkMode) {
+      setDarkMode(JSON.parse(savedDarkMode))
+    }
+  }, [])
+
+  // Save dark mode preference to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode))
+  }, [darkMode])
 
   useEffect(() => {
     fetchUserData()
@@ -55,11 +70,11 @@ export default function Profile() {
     try {
       setLoading(true)
       const response = await fetch('/api/user')
-      
+
       if (response.ok) {
         const data = await response.json()
         console.log('User data:', data)
-        
+
         if (data.data) {
           setUserData(data.data)
           if (data.data.preferences) {
@@ -86,7 +101,7 @@ export default function Profile() {
     try {
       setFriendsLoading(true)
       const response = await fetch('/api/friends')
-      
+
       if (response.ok) {
         const data = await response.json()
         setFriends(data.data.friends || [])
@@ -141,7 +156,7 @@ export default function Profile() {
   const savePreferences = async () => {
     setSaving(true)
     setMessage('')
-    
+
     try {
       const response = await fetch('/api/user', {
         method: 'PUT',
@@ -187,13 +202,13 @@ export default function Profile() {
   // Friends functions
   const searchUser = async () => {
     if (!searchEmail.trim()) return
-    
+
     try {
       setSearching(true)
       setSearchResult(null)
-      
+
       const response = await fetch(`/api/users/search?email=${encodeURIComponent(searchEmail)}`)
-      
+
       if (response.ok) {
         const data = await response.json()
         setSearchResult(data.data)
@@ -276,34 +291,47 @@ export default function Profile() {
     }
   }
 
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode)
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} flex items-center justify-center`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your profile...</p>
+          <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Loading your profile...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
       {/* Header */}
-      <header className="bg-white shadow">
+      <header className={`${darkMode ? 'bg-gray-800' : 'bg-white'} shadow`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Link href="/contests" className="text-gray-700 hover:text-gray-900 mr-4">
+              <Link href="/contests" className={`${darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-gray-900'} mr-4`}>
                 ← Back to Dashboard
               </Link>
-              <h1 className="text-xl font-semibold text-gray-900">Profile</h1>
+              <h1 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Profile</h1>
             </div>
-            {userData && (
-              <div className="text-sm text-gray-500">
-                Last updated: {new Date(userData.updatedAt).toLocaleDateString()}
-              </div>
-            )}
+            <div className="flex items-center space-x-4">
+              {userData && (
+                <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Last updated: {new Date(userData.updatedAt).toLocaleDateString()}
+                </div>
+              )}
+              <button
+                onClick={toggleDarkMode}
+                className={`p-2 rounded-md ${darkMode ? 'bg-gray-700 text-yellow-400 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} transition-colors`}
+                aria-label="Toggle dark mode"
+              >
+                {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -311,9 +339,9 @@ export default function Profile() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* User Profile */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">Account Information</h2>
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow`}>
+            <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+              <h2 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Account Information</h2>
             </div>
             <div className="p-6">
               {user ? (
@@ -326,7 +354,7 @@ export default function Profile() {
                       className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
                     />
                     <div>
-                      <h3 className="text-lg font-medium text-gray-900">
+                      <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                         {user.firstName} {user.lastName}
                       </h3>
                     </div>
@@ -335,32 +363,32 @@ export default function Profile() {
                   {/* User Details */}
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Email</label>
-                      <p className="mt-1 text-sm text-gray-900">{user.primaryEmailAddress?.emailAddress}</p>
+                      <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Email</label>
+                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>{user.primaryEmailAddress?.emailAddress}</p>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Full Name</label>
-                      <p className="mt-1 text-sm text-gray-900">
+                      <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Full Name</label>
+                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
                         {user.firstName} {user.lastName}
                       </p>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">User ID</label>
-                      <p className="mt-1 text-sm text-gray-500 font-mono">{user.id}</p>
+                      <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>User ID</label>
+                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} font-mono`}>{user.id}</p>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Account Created</label>
-                      <p className="mt-1 text-sm text-gray-900">
+                      <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Account Created</label>
+                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
                         {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
                       </p>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Last Sign In</label>
-                      <p className="mt-1 text-sm text-gray-900">
+                      <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Last Sign In</label>
+                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
                         {user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleDateString() : 'Unknown'}
                       </p>
                     </div>
@@ -368,21 +396,21 @@ export default function Profile() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-gray-600">Loading user information...</p>
+                  <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Loading user information...</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* Friends Section */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">Friends</h2>
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow`}>
+            <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+              <h2 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Friends</h2>
             </div>
             <div className="p-6 space-y-6">
               {/* Add Friend */}
               <div>
-                <h3 className="text-md font-medium text-gray-900 mb-4">Add Friend</h3>
+                <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>Add Friend</h3>
                 <div className="space-y-3">
                   <div className="flex space-x-2">
                     <input
@@ -390,7 +418,10 @@ export default function Profile() {
                       placeholder="Enter friend's email"
                       value={searchEmail}
                       onChange={(e) => setSearchEmail(e.target.value)}
-                      className="text-black flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode
+                          ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                          : 'bg-white border-gray-300 text-black placeholder-gray-500'
+                        }`}
                     />
                     <button
                       onClick={searchUser}
@@ -400,9 +431,9 @@ export default function Profile() {
                       {searching ? 'Searching...' : 'Search'}
                     </button>
                   </div>
-                  
+
                   {searchResult && (
-                    <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
                       <div className="flex items-center space-x-3">
                         <img
                           src={searchResult.imageUrl || '/default-avatar.png'}
@@ -410,10 +441,10 @@ export default function Profile() {
                           className="w-10 h-10 rounded-full object-cover"
                         />
                         <div className="flex-1">
-                          <p className="font-medium text-gray-900">
+                          <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                             {searchResult.firstName} {searchResult.lastName}
                           </p>
-                          <p className="text-sm text-gray-600">{searchResult.email}</p>
+                          <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{searchResult.email}</p>
                         </div>
                         <button
                           onClick={() => sendFriendRequest(searchResult.clerkId)}
@@ -430,10 +461,10 @@ export default function Profile() {
               {/* Friend Requests */}
               {receivedRequests.length > 0 && (
                 <div>
-                  <h3 className="text-md font-medium text-gray-900 mb-4">Friend Requests ({receivedRequests.length})</h3>
+                  <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>Friend Requests ({receivedRequests.length})</h3>
                   <div className="space-y-3">
                     {receivedRequests.map((request) => (
-                      <div key={request.clerkId} className="p-3 bg-blue-50 rounded-lg">
+                      <div key={request.clerkId} className={`p-3 rounded-lg ${darkMode ? 'bg-blue-900' : 'bg-blue-50'}`}>
                         <div className="flex items-center space-x-3">
                           <img
                             src={request.imageUrl || '/default-avatar.png'}
@@ -441,10 +472,10 @@ export default function Profile() {
                             className="w-8 h-8 rounded-full object-cover"
                           />
                           <div className="flex-1">
-                            <p className="font-medium text-gray-900">
+                            <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                               {request.firstName} {request.lastName}
                             </p>
-                            <p className="text-sm text-gray-600">{request.email}</p>
+                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{request.email}</p>
                           </div>
                           <div className="flex space-x-2">
                             <button
@@ -470,10 +501,10 @@ export default function Profile() {
               {/* Sent Requests */}
               {sentRequests.length > 0 && (
                 <div>
-                  <h3 className="text-md font-medium text-gray-900 mb-4">Sent Requests ({sentRequests.length})</h3>
+                  <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>Sent Requests ({sentRequests.length})</h3>
                   <div className="space-y-3">
                     {sentRequests.map((request) => (
-                      <div key={request.clerkId} className="p-3 bg-yellow-50 rounded-lg">
+                      <div key={request.clerkId} className={`p-3 rounded-lg ${darkMode ? 'bg-yellow-900' : 'bg-yellow-50'}`}>
                         <div className="flex items-center space-x-3">
                           <img
                             src={request.imageUrl || '/default-avatar.png'}
@@ -481,10 +512,10 @@ export default function Profile() {
                             className="w-8 h-8 rounded-full object-cover"
                           />
                           <div className="flex-1">
-                            <p className="font-medium text-gray-900">
+                            <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                               {request.firstName} {request.lastName}
                             </p>
-                            <p className="text-sm text-gray-600">{request.email}</p>
+                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{request.email}</p>
                           </div>
                           <button
                             onClick={() => cancelFriendRequest(request.clerkId)}
@@ -501,7 +532,7 @@ export default function Profile() {
 
               {/* Friends List */}
               <div>
-                <h3 className="text-md font-medium text-gray-900 mb-4">My Friends ({friends.length})</h3>
+                <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>My Friends ({friends.length})</h3>
                 {friendsLoading ? (
                   <div className="text-center py-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
@@ -509,7 +540,7 @@ export default function Profile() {
                 ) : friends.length > 0 ? (
                   <div className="space-y-3">
                     {friends.map((friend) => (
-                      <div key={friend.clerkId} className="p-3 bg-green-50 rounded-lg">
+                      <div key={friend.clerkId} className={`p-3 rounded-lg ${darkMode ? 'bg-green-900' : 'bg-green-50'}`}>
                         <div className="flex items-center space-x-3">
                           <img
                             src={friend.imageUrl || '/default-avatar.png'}
@@ -517,10 +548,10 @@ export default function Profile() {
                             className="w-8 h-8 rounded-full object-cover"
                           />
                           <div className="flex-1">
-                            <p className="font-medium text-gray-900">
+                            <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                               {friend.firstName} {friend.lastName}
                             </p>
-                            <p className="text-sm text-gray-600">{friend.email}</p>
+                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{friend.email}</p>
                           </div>
                           <Link
                             href={`/profile/${friend.clerkId}`}
@@ -533,19 +564,19 @@ export default function Profile() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-600 text-sm">No friends yet. Search for users to add them as friends!</p>
+                  <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>No friends yet. Search for users to add them as friends!</p>
                 )}
               </div>
             </div>
           </div>
 
           {/* Preferences */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-lg font-medium text-gray-900">Preferences</h2>
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow`}>
+            <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
+              <h2 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Preferences</h2>
               <button
                 onClick={resetToDefaults}
-                className="text-sm text-blue-600 hover:text-blue-800"
+                className={`text-sm ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
               >
                 Reset to Defaults
               </button>
@@ -553,16 +584,16 @@ export default function Profile() {
             <div className="p-6 space-y-6">
               {/* Platform Preferences */}
               <div>
-                <h3 className="text-md font-medium text-gray-900 mb-4">Platform Preferences</h3>
-                <p className="text-sm text-gray-600 mb-4">Select which platforms you want to see contests from:</p>
+                <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>Platform Preferences</h3>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>Select which platforms you want to see contests from:</p>
                 <div className="space-y-3">
                   {[
-                    { key: 'codeforces' as keyof UserPreferences, label: 'Codeforces', color: 'text-red-600', bgColor: 'bg-red-50' },
-                    { key: 'codechef' as keyof UserPreferences, label: 'CodeChef', color: 'text-orange-600', bgColor: 'bg-orange-50' },
-                    { key: 'leetcode' as keyof UserPreferences, label: 'LeetCode', color: 'text-yellow-600', bgColor: 'bg-yellow-50' },
-                    { key: 'geeksforgeeks' as keyof UserPreferences, label: 'GeeksforGeeks', color: 'text-green-600', bgColor: 'bg-green-50' }
+                    { key: 'codeforces' as keyof UserPreferences, label: 'Codeforces', color: 'text-red-600', bgColor: darkMode ? 'bg-red-900' : 'bg-red-50' },
+                    { key: 'codechef' as keyof UserPreferences, label: 'CodeChef', color: 'text-orange-600', bgColor: darkMode ? 'bg-orange-900' : 'bg-orange-50' },
+                    { key: 'leetcode' as keyof UserPreferences, label: 'LeetCode', color: 'text-yellow-600', bgColor: darkMode ? 'bg-yellow-900' : 'bg-yellow-50' },
+                    { key: 'geeksforgeeks' as keyof UserPreferences, label: 'GeeksforGeeks', color: 'text-green-600', bgColor: darkMode ? 'bg-green-900' : 'bg-green-50' }
                   ].map((platform) => (
-                    <div key={platform.key} className={`flex items-center p-3 rounded-lg ${preferences[platform.key] ? platform.bgColor : 'bg-gray-50'}`}>
+                    <div key={platform.key} className={`flex items-center p-3 rounded-lg ${preferences[platform.key] ? platform.bgColor : (darkMode ? 'bg-gray-700' : 'bg-gray-50')}`}>
                       <input
                         type="checkbox"
                         id={platform.key}
@@ -580,10 +611,10 @@ export default function Profile() {
 
               {/* Notification Preferences */}
               <div>
-                <h3 className="text-md font-medium text-gray-900 mb-4">Notification Preferences</h3>
-                <p className="text-sm text-gray-600 mb-4">Choose how you want to be notified about contests:</p>
+                <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>Notification Preferences</h3>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>Choose how you want to be notified about contests:</p>
                 <div className="space-y-3">
-                  <div className="flex items-center p-3 rounded-lg bg-gray-50">
+                  <div className={`flex items-center p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
                     <input
                       type="checkbox"
                       id="emailNotifications"
@@ -591,11 +622,11 @@ export default function Profile() {
                       onChange={(e) => handlePreferenceChange('emailNotifications', e.target.checked)}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
-                    <label htmlFor="emailNotifications" className="ml-3 block text-sm text-gray-900">
+                    <label htmlFor="emailNotifications" className={`ml-3 block text-sm ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
                       Email notifications for new contests
                     </label>
                   </div>
-                  <div className="flex items-center p-3 rounded-lg bg-gray-50">
+                  <div className={`flex items-center p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
                     <input
                       type="checkbox"
                       id="reminders"
@@ -603,7 +634,7 @@ export default function Profile() {
                       onChange={(e) => handlePreferenceChange('reminders', e.target.checked)}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
-                    <label htmlFor="reminders" className="ml-3 block text-sm text-gray-900">
+                    <label htmlFor="reminders" className={`ml-3 block text-sm ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
                       Contest reminders (1 hour before)
                     </label>
                   </div>
@@ -612,11 +643,10 @@ export default function Profile() {
 
               {/* Message */}
               {message && (
-                <div className={`p-4 rounded-md border ${
-                  message.includes('successfully') || message.includes('Reset') 
-                    ? 'bg-green-50 text-green-800 border-green-200' 
-                    : 'bg-red-50 text-red-800 border-red-200'
-                }`}>
+                <div className={`p-4 rounded-md border ${message.includes('successfully') || message.includes('Reset')
+                    ? (darkMode ? 'bg-green-900 text-green-200 border-green-700' : 'bg-green-50 text-green-800 border-green-200')
+                    : (darkMode ? 'bg-red-900 text-red-200 border-red-700' : 'bg-red-50 text-red-800 border-red-200')
+                  }`}>
                   <div className="flex items-center">
                     {message.includes('successfully') || message.includes('Reset') ? (
                       <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -655,4 +685,4 @@ export default function Profile() {
       </div>
     </div>
   )
-} 
+}

@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [showUpcoming, setShowUpcoming] = useState(true)
   const [showPastContests, setShowPastContests] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [darkMode, setDarkMode] = useState(false)
 
   // New filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -35,6 +36,22 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState<string>('startTime')
 
   // Fetch contests when component mounts or filters change
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme')
+    if (savedTheme) {
+      setDarkMode(savedTheme === 'dark')
+    } else {
+      // Check system preference
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      setDarkMode(prefersDark)
+    }
+  }, [])
+
+  // Update localStorage when theme changes
+  useEffect(() => {
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light')
+  }, [darkMode])
+
   useEffect(() => {
     fetchContests()
   }, [selectedPlatform, showUpcoming, showPastContests])
@@ -86,22 +103,22 @@ export default function Dashboard() {
 
   const handleRegister = async (contest: Contest) => {
     if (!user?.id) return
-    
+
     // Check if contest has already started
     const now = new Date()
     const contestStartTime = new Date(contest.startTime)
     const contestEndTime = new Date(contest.endTime)
-    
+
     if (now >= contestEndTime) {
       alert('This contest has already ended. Registration is not possible.')
       return
     }
-    
+
     if (now >= contestStartTime) {
       alert('This contest has already started. Registration is not possible.')
       return
     }
-    
+
     try {
       const res = await fetch(`/api/users/${user.id}/registered-contests`, {
         method: 'POST',
@@ -167,8 +184,8 @@ export default function Dashboard() {
   }
 
   const getDifficultyColor = (difficulty?: string) => {
-    if (!difficulty) return 'bg-gray-100 text-gray-600'
-    const colors = {
+    if (!difficulty) return darkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-600'
+    const lightColors = {
       easy: 'bg-green-100 text-green-700',
       medium: 'bg-yellow-100 text-yellow-700',
       hard: 'bg-red-100 text-red-700',
@@ -176,6 +193,17 @@ export default function Dashboard() {
       intermediate: 'bg-purple-100 text-purple-700',
       advanced: 'bg-red-100 text-red-700'
     }
+
+    const darkColors = {
+      easy: 'bg-green-900/30 text-green-400',
+      medium: 'bg-yellow-900/30 text-yellow-400',
+      hard: 'bg-red-900/30 text-red-400',
+      beginner: 'bg-blue-900/30 text-blue-400',
+      intermediate: 'bg-purple-900/30 text-purple-400',
+      advanced: 'bg-red-900/30 text-red-400'
+    }
+
+    const colors = darkMode ? darkColors : lightColors
     return colors[difficulty.toLowerCase() as keyof typeof colors] || 'bg-gray-100 text-gray-600'
   }
 
@@ -183,7 +211,7 @@ export default function Dashboard() {
     const now = new Date()
     const startTime = new Date(contest.startTime)
     const endTime = new Date(contest.endTime)
-    
+
     if (now >= endTime) {
       return { status: 'ended', label: 'Contest Ended', color: 'bg-gray-500', disabled: true }
     } else if (now >= startTime) {
@@ -270,33 +298,53 @@ export default function Dashboard() {
       }
     })
 
+  const themeClasses = {
+    bg: darkMode ? 'bg-gray-900' : 'bg-gray-50',
+    cardBg: darkMode ? 'bg-gray-800' : 'bg-white',
+    headerBg: darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white',
+    text: darkMode ? 'text-gray-100' : 'text-gray-900',
+    textSecondary: darkMode ? 'text-gray-400' : 'text-gray-600',
+    textTertiary: darkMode ? 'text-gray-500' : 'text-gray-500',
+    border: darkMode ? 'border-gray-700' : 'border-gray-200',
+    input: darkMode ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-300 text-black',
+    shadow: darkMode ? 'shadow-lg shadow-gray-900/50' : 'shadow',
+    hover: darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className={`min-h-screen ${themeClasses.bg} flex items-center justify-center`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading contests...</p>
+          <p className={themeClasses.textSecondary}>Loading contests...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen ${themeClasses.bg} transition-colors duration-300`}>
       {/* Header */}
-      <header className="bg-white shadow">
+      <header className={`${themeClasses.headerBg} shadow-lg border-b ${themeClasses.border} transition-colors duration-300`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Link href="/" className="text-xl font-semibold text-gray-900">CP Portal Dashboard</Link>
+              <Link href="/" className={`text-xl font-bold ${themeClasses.text} hover:text-blue-500 transition-colors`}>CP Portal Dashboard</Link>
             </div>
             <div className="flex items-center space-x-4">
-              <Link href="/problems" className="text-gray-700 hover:text-gray-900">
+              <Link href="/problems" className={`${themeClasses.textSecondary} hover:text-blue-500 transition-colors font-medium`}>
                 Problems
               </Link>
-              <Link href="/profile" className="text-gray-700 hover:text-gray-900">
+              <Link href="/profile" className={`${themeClasses.textSecondary} hover:text-blue-500 transition-colors font-medium`}>
                 Profile
               </Link>
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className={`p-2 rounded-full ${themeClasses.hover} transition-colors duration-200`}
+                aria-label="Toggle dark mode"
+              >
+                {darkMode ? '☀️' : '🌙'}
+              </button>
               <UserButton />
             </div>
           </div>
@@ -306,23 +354,23 @@ export default function Dashboard() {
       {/* Stats and Filters */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Stats */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className={`${themeClasses.cardBg} rounded-xl ${themeClasses.shadow} p-6 mb-6 border ${themeClasses.border} transition-all duration-300`}>
           <div className="flex flex-wrap items-center justify-between">
             <div className="flex items-center space-x-6">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Contests</p>
-                <p className="text-2xl font-bold text-gray-900">{filteredContests.length}</p>
+                <p className={`text-sm font-medium ${themeClasses.textSecondary}`}>Total Contests</p>
+                <p className={`text-3xl font-bold ${themeClasses.text} bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent`}>{filteredContests.length}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-600">Platforms</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className={`text-sm font-medium ${themeClasses.textSecondary}`}>Platforms</p>
+                <p className={`text-3xl font-bold ${themeClasses.text} bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent`}>
                   {new Set(contests.map(c => c.platform)).size}
                 </p>
               </div>
               {lastUpdated && (
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Last Updated</p>
-                  <p className="text-sm text-gray-900">{lastUpdated.toLocaleTimeString()}</p>
+                  <p className={`text-sm font-medium ${themeClasses.textSecondary}`}>Last Updated</p>
+                  <p className={`text-sm ${themeClasses.text} font-semibold`}>{lastUpdated.toLocaleTimeString()}</p>
                 </div>
               )}
             </div>
@@ -344,17 +392,17 @@ export default function Dashboard() {
         </div>
 
         {/* Advanced Filters */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className={`${themeClasses.cardBg} rounded-xl ${themeClasses.shadow} p-6 mb-6 border ${themeClasses.border} transition-all duration-300`}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Platform Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={`block text-sm font-medium ${themeClasses.text} mb-2`}>
                 Platform
               </label>
               <select
                 value={selectedPlatform}
                 onChange={(e) => setSelectedPlatform(e.target.value)}
-                className="w-full border text-black border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full border ${themeClasses.input} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors`}
               >
                 {platforms.map((platform) => (
                   <option key={platform.value} value={platform.value}>
@@ -366,13 +414,13 @@ export default function Dashboard() {
 
             {/* Duration Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={`block text-sm font-medium ${themeClasses.text} mb-2`}>
                 Duration
               </label>
               <select
                 value={durationFilter}
                 onChange={(e) => setDurationFilter(e.target.value)}
-                className="w-full border text-black border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full border ${themeClasses.input} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors`}
               >
                 {durationOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -384,13 +432,13 @@ export default function Dashboard() {
 
             {/* Date Range Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={`block text-sm font-medium ${themeClasses.text} mb-2`}>
                 Date Range
               </label>
               <select
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
-                className="w-full border  text-black border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full border ${themeClasses.input} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors`}
               >
                 {dateRangeOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -402,13 +450,13 @@ export default function Dashboard() {
 
             {/* Sort By */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={`block text-sm font-medium ${themeClasses.text} mb-2`}>
                 Sort By
               </label>
               <select
-                value={sortBy}
+                value={dateRange}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="w-full border text-black border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full border ${themeClasses.input} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors`}
               >
                 {sortOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -422,7 +470,7 @@ export default function Dashboard() {
           {/* Search and Upcoming Toggle */}
           <div className="mt-4 flex flex-wrap gap-4 items-center">
             <div className="flex-1 min-w-64">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={`block text-sm font-medium ${themeClasses.text} mb-2`}>
                 Search Contests
               </label>
               <input
@@ -430,7 +478,7 @@ export default function Dashboard() {
                 placeholder="Search by contest name..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full border text-black border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full border ${themeClasses.input} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors`}
               />
             </div>
 
@@ -443,7 +491,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowUpcoming(e.target.checked)}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <label htmlFor="upcoming" className="ml-2 block text-sm text-gray-900">
+                <label htmlFor="upcoming" className={`ml-3 block text-sm ${themeClasses.text} font-medium`}>
                   Show upcoming contests only
                 </label>
               </div>
@@ -455,7 +503,7 @@ export default function Dashboard() {
                   onChange={(e) => setShowPastContests(e.target.checked)}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <label htmlFor="pastContests" className="ml-2 block text-sm text-gray-900">
+                <label htmlFor="pastContests" className={`ml-3 block text-sm ${themeClasses.text} font-medium`}>
                   Show past contests
                 </label>
               </div>
@@ -465,7 +513,7 @@ export default function Dashboard() {
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+          <div className={`${darkMode ? 'bg-red-900/20 border-red-800' : 'bg-red-50 border-red-200'} border rounded-xl p-4 mb-6 transition-colors duration-300`}>
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -473,8 +521,10 @@ export default function Dashboard() {
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error loading contests</h3>
-                <div className="mt-2 text-sm text-red-700">
+                <h3 className={`text-sm font-medium ${darkMode ? 'text-red-300' : 'text-red-800'}`}>
+                  Error loading contests
+                </h3>
+                <div className={`mt-2 text-sm ${darkMode ? 'text-red-400' : 'text-red-700'}`}>
                   <p>{error}</p>
                 </div>
               </div>
@@ -483,22 +533,22 @@ export default function Dashboard() {
         )}
 
         {/* Contests Grid */}
-        <div className="bg-white rounded-lg shadow">
+        <div className={`${themeClasses.cardBg} rounded-xl ${themeClasses.shadow} border ${themeClasses.border} transition-all duration-300`}>
           {filteredContests.length === 0 ? (
             <div className="p-8 text-center">
-              <div className="text-gray-400 mb-4">
+              <div className={`${themeClasses.textSecondary} mb-4`}>
                 <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
-              <p className="text-gray-600">No contests found.</p>
-              <p className="text-sm text-gray-500 mt-1">Try adjusting your filters or search terms.</p>
+              <p className={`${themeClasses.text} text-lg font-medium mb-2`}>No contests found.</p>
+              <p className={`text-sm ${themeClasses.textSecondary}`}>Try adjusting your filters or search terms.</p>
             </div>
           ) : (
-            <div className="p-6">
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6 mb-6`}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredContests.map((contest) => (
-                  <div key={contest._id} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                  <div key={contest._id} className={`${darkMode ? 'bg-gray-700 border-gray-600 hover:bg-gray-600' : 'bg-white border-gray-200 hover:shadow-md'} border rounded-lg shadow-sm transition-shadow`}>
                     <div className="p-6">
                       {/* Platform Badge */}
                       <div className="flex items-center justify-between mb-3">
@@ -540,13 +590,16 @@ export default function Dashboard() {
                       </div>
 
                       {/* Contest Name */}
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                      <h3 className={`${darkMode
+                        ? 'text-lg text-white font-semibold mb-2 line-clamp-2'
+                        : 'text-lg font-semibold text-gray-900 mb-2 line-clamp-2'
+                        }`} >
                         {contest.name}
                       </h3>
 
                       {/* Description */}
                       {contest.description && (
-                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                        <p className={`${darkMode ? 'text-gray-200' : 'text-gray-600'} text-sm mb-3 line-clamp-2`}>
                           {contest.description}
                         </p>
                       )}
@@ -562,14 +615,14 @@ export default function Dashboard() {
 
                       {/* Contest Details */}
                       <div className="space-y-2 mb-4">
-                        <div className="flex items-center text-sm text-gray-600">
+                        <div className={`flex items-center text-sm ${darkMode ? 'text-gray-200' : 'text-gray-600'}`}>
                           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                           <span className="font-medium">Start:</span>
                           <span className="ml-1">{formatDate(contest.startTime)}</span>
                         </div>
-                        <div className="flex items-center text-sm text-gray-600">
+                        <div className={`flex items-center text-sm ${darkMode ? 'text-gray-200' : 'text-gray-600'}`}>
                           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
@@ -603,8 +656,8 @@ export default function Dashboard() {
                           )
                         } else {
                           return (
-                            <button 
-                              onClick={() => handleRegister(contest)} 
+                            <button
+                              onClick={() => handleRegister(contest)}
                               className={`w-full ${status.color} text-white mt-4 px-4 py-2 rounded-md hover:opacity-90 transition-opacity`}
                             >
                               {status.label}
@@ -620,6 +673,6 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-    </div>
+    </div >
   )
 } 
