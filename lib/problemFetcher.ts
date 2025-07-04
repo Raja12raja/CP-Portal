@@ -67,7 +67,7 @@ export class ProblemFetcher {
         `,
         variables: {
           categorySlug: "",
-          limit: 100,
+          limit: 300,
           skip: 0,
           filters: {}
         }
@@ -120,7 +120,7 @@ export class ProblemFetcher {
       const problems = response.data.result.problems;
       console.log(`Found ${problems.length} Codeforces problems`);
 
-      return problems.slice(0, 100).map((problem: any) => ({
+      return problems.slice(0, 300).map((problem: any) => ({
         title: problem.name,
         platform: 'codeforces' as const,
         problemId: `${problem.contestId}${problem.index}`,
