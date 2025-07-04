@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const platform = searchParams.get('platform');
     const limit = parseInt(searchParams.get('limit') || '50');
     const upcoming = searchParams.get('upcoming') === 'true';
+    const includePast = searchParams.get('includePast') === 'true';
 
     let query: any = {};
 
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter for upcoming contests if requested
-    if (upcoming) {
+    if (upcoming && !includePast) {
       query.startTime = { $gte: new Date() };
     }
 

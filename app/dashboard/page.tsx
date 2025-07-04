@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string>('')
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all')
   const [showUpcoming, setShowUpcoming] = useState(true)
+  const [showPastContests, setShowPastContests] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   // New filters
@@ -36,7 +37,7 @@ export default function Dashboard() {
   // Fetch contests when component mounts or filters change
   useEffect(() => {
     fetchContests()
-  }, [selectedPlatform, showUpcoming])
+  }, [selectedPlatform, showUpcoming, showPastContests])
 
   const fetchContests = async () => {
     try {
@@ -47,8 +48,11 @@ export default function Dashboard() {
       if (selectedPlatform !== 'all') {
         params.append('platform', selectedPlatform)
       }
-      if (showUpcoming) {
+      if (showUpcoming && !showPastContests) {
         params.append('upcoming', 'true')
+      }
+      if (showPastContests) {
+        params.append('includePast', 'true')
       }
 
       console.log('Fetching contests with params:', params.toString())
@@ -82,6 +86,22 @@ export default function Dashboard() {
 
   const handleRegister = async (contest: Contest) => {
     if (!user?.id) return
+    
+    // Check if contest has already started
+    const now = new Date()
+    const contestStartTime = new Date(contest.startTime)
+    const contestEndTime = new Date(contest.endTime)
+    
+    if (now >= contestEndTime) {
+      alert('This contest has already ended. Registration is not possible.')
+      return
+    }
+    
+    if (now >= contestStartTime) {
+      alert('This contest has already started. Registration is not possible.')
+      return
+    }
+    
     try {
       const res = await fetch(`/api/users/${user.id}/registered-contests`, {
         method: 'POST',
@@ -157,6 +177,20 @@ export default function Dashboard() {
       advanced: 'bg-red-100 text-red-700'
     }
     return colors[difficulty.toLowerCase() as keyof typeof colors] || 'bg-gray-100 text-gray-600'
+  }
+
+  const getContestStatus = (contest: Contest) => {
+    const now = new Date()
+    const startTime = new Date(contest.startTime)
+    const endTime = new Date(contest.endTime)
+    
+    if (now >= endTime) {
+      return { status: 'ended', label: 'Contest Ended', color: 'bg-gray-500', disabled: true }
+    } else if (now >= startTime) {
+      return { status: 'ongoing', label: 'Contest Ongoing', color: 'bg-orange-500', disabled: true }
+    } else {
+      return { status: 'upcoming', label: 'Register', color: 'bg-green-600', disabled: false }
+    }
   }
 
   const platforms = [
@@ -254,7 +288,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">CP Portal Dashboard</h1>
+              <Link href="/" className="text-xl font-semibold text-gray-900">CP Portal Dashboard</Link>
             </div>
             <div className="flex items-center space-x-4">
               <Link href="/profile" className="text-gray-700 hover:text-gray-900">
@@ -397,17 +431,31 @@ export default function Dashboard() {
               />
             </div>
 
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="upcoming"
-                checked={showUpcoming}
-                onChange={(e) => setShowUpcoming(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="upcoming" className="ml-2 block text-sm text-gray-900">
-                Show upcoming contests only
-              </label>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="upcoming"
+                  checked={showUpcoming}
+                  onChange={(e) => setShowUpcoming(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="upcoming" className="ml-2 block text-sm text-gray-900">
+                  Show upcoming contests only
+                </label>
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="pastContests"
+                  checked={showPastContests}
+                  onChange={(e) => setShowPastContests(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="pastContests" className="ml-2 block text-sm text-gray-900">
+                  Show past contests
+                </label>
+              </div>
             </div>
           </div>
         </div>
@@ -457,11 +505,35 @@ export default function Dashboard() {
                             {contest.platform}
                           </span>
                         </div>
-                        {contest.isRated && (
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
-                            Rated
-                          </span>
-                        )}
+                        <div className="flex items-center space-x-2">
+                          {contest.isRated && (
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                              Rated
+                            </span>
+                          )}
+                          {(() => {
+                            const status = getContestStatus(contest)
+                            if (status.status === 'ended') {
+                              return (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
+                                  Ended
+                                </span>
+                              )
+                            } else if (status.status === 'ongoing') {
+                              return (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-600">
+                                  Live
+                                </span>
+                              )
+                            } else {
+                              return (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-600">
+                                  Upcoming
+                                </span>
+                              )
+                            }
+                          })()}
+                        </div>
                       </div>
 
                       {/* Contest Name */}
@@ -512,12 +584,31 @@ export default function Dashboard() {
                       >
                         View Contest →
                       </a>
-                      {contest.isRegistered ? (
-                        <button className="w-full bg-red-600 text-white mt-4 px-4 py-2 rounded-md" disabled>✅ Registered</button>
-                      ) :
-                        (
-                          <button onClick={() => handleRegister(contest)} className="w-full bg-green-600 text-white mt-4 px-4 py-2 rounded-md">Register</button>
-                        )}
+                      {(() => {
+                        const status = getContestStatus(contest)
+                        if (contest.isRegistered) {
+                          return (
+                            <button className="w-full bg-red-600 text-white mt-4 px-4 py-2 rounded-md" disabled>
+                              ✅ Registered
+                            </button>
+                          )
+                        } else if (status.disabled) {
+                          return (
+                            <button className={`w-full ${status.color} text-white mt-4 px-4 py-2 rounded-md`} disabled>
+                              {status.label}
+                            </button>
+                          )
+                        } else {
+                          return (
+                            <button 
+                              onClick={() => handleRegister(contest)} 
+                              className={`w-full ${status.color} text-white mt-4 px-4 py-2 rounded-md hover:opacity-90 transition-opacity`}
+                            >
+                              {status.label}
+                            </button>
+                          )
+                        }
+                      })()}
                     </div>
                   </div>
                 ))}

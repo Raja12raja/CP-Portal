@@ -50,6 +50,25 @@ export async function POST(
     try {
         await connectDB();
 
+        // Check if contest has already started or ended
+        const now = new Date();
+        const contestStartTime = new Date(contest.startTime);
+        const contestEndTime = new Date(contest.endTime);
+
+        if (now >= contestEndTime) {
+            return NextResponse.json({
+                success: false,
+                error: 'This contest has already ended. Registration is not possible.'
+            }, { status: 400 });
+        }
+
+        if (now >= contestStartTime) {
+            return NextResponse.json({
+                success: false,
+                error: 'This contest has already started. Registration is not possible.'
+            }, { status: 400 });
+        }
+
         // Prevent duplicate registration
         const exists = await Registration.findOne({
             userId,
