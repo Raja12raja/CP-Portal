@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { UserButton } from '@clerk/nextjs'
+import { UserButton, useUser } from '@clerk/nextjs'
 import Link from 'next/link'
 
 interface Contest {
@@ -15,16 +15,18 @@ interface Contest {
   description?: string
   difficulty?: string
   isRated?: boolean
+  isRegistered?: boolean
 }
 
 export default function Dashboard() {
+  const { user } = useUser()
   const [contests, setContests] = useState<Contest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all')
   const [showUpcoming, setShowUpcoming] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  
+
   // New filters
   const [searchTerm, setSearchTerm] = useState('')
   const [durationFilter, setDurationFilter] = useState<string>('all')
@@ -40,7 +42,7 @@ export default function Dashboard() {
     try {
       setLoading(true)
       setError('')
-      
+
       const params = new URLSearchParams()
       if (selectedPlatform !== 'all') {
         params.append('platform', selectedPlatform)
@@ -48,13 +50,22 @@ export default function Dashboard() {
       if (showUpcoming) {
         params.append('upcoming', 'true')
       }
-      
+
       console.log('Fetching contests with params:', params.toString())
       const response = await fetch(`/api/contests?${params}`)
       const data = await response.json()
-      
       if (data.success) {
-        setContests(data.data)
+        const contestsData = data.data
+        if (!user?.id) return
+        const regRes = await fetch(`/api/users/${user.id}/registered-contests`)
+        const regData = await regRes.json()
+        const registeredUrls = new Set((regData.data || []).map((c: Contest) => c.url))
+
+        const enriched = contestsData.map((c: Contest) => ({
+          ...c,
+          isRegistered: registeredUrls.has(c.url)
+        }))
+        setContests(enriched)
         setLastUpdated(new Date())
         console.log(`Fetched ${data.data.length} contests`)
       } else {
@@ -69,11 +80,34 @@ export default function Dashboard() {
     }
   }
 
+  const handleRegister = async (contest: Contest) => {
+    if (!user?.id) return
+    try {
+      const res = await fetch(`/api/users/${user.id}/registered-contests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, contest })
+      })
+      const data = await res.json()
+      console.log('Register response:', data)
+      if (res.ok) {
+        setContests(prev =>
+          prev.map(c => c.url === contest.url ? { ...c, isRegistered: true } : c)
+        )
+      } else {
+        alert(data.error || 'Failed to register.')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Failed to register.')
+    }
+  }
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
     const diffInHours = (date.getTime() - now.getTime()) / (1000 * 60 * 60)
-    
+
     if (diffInHours < 0) {
       return `Started ${Math.abs(Math.floor(diffInHours))}h ago`
     } else if (diffInHours < 24) {
@@ -162,7 +196,7 @@ export default function Dashboard() {
       if (searchTerm && !contest.name.toLowerCase().includes(searchTerm.toLowerCase())) {
         return false
       }
-      
+
       // Duration filter
       if (durationFilter !== 'all') {
         const hours = contest.duration / 60
@@ -170,7 +204,7 @@ export default function Dashboard() {
         if (durationFilter === 'medium' && (hours < 2 || hours > 4)) return false
         if (durationFilter === 'long' && hours <= 4) return false
       }
-      
+
       // Date range filter
       if (dateRange !== 'all') {
         const contestDate = new Date(contest.startTime)
@@ -178,13 +212,13 @@ export default function Dashboard() {
         const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
         const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
         const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-        
+
         if (dateRange === 'today' && contestDate.toDateString() !== now.toDateString()) return false
         if (dateRange === 'tomorrow' && contestDate.toDateString() !== tomorrow.toDateString()) return false
         if (dateRange === 'week' && contestDate > weekEnd) return false
         if (dateRange === 'month' && contestDate > monthEnd) return false
       }
-      
+
       return true
     })
     .sort((a, b) => {
@@ -283,7 +317,7 @@ export default function Dashboard() {
               <select
                 value={selectedPlatform}
                 onChange={(e) => setSelectedPlatform(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border text-black border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {platforms.map((platform) => (
                   <option key={platform.value} value={platform.value}>
@@ -301,7 +335,7 @@ export default function Dashboard() {
               <select
                 value={durationFilter}
                 onChange={(e) => setDurationFilter(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border text-black border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {durationOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -319,7 +353,7 @@ export default function Dashboard() {
               <select
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border  text-black border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {dateRangeOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -337,7 +371,7 @@ export default function Dashboard() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border text-black border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {sortOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -359,10 +393,10 @@ export default function Dashboard() {
                 placeholder="Search by contest name..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border text-black border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            
+
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -478,6 +512,12 @@ export default function Dashboard() {
                       >
                         View Contest →
                       </a>
+                      {contest.isRegistered ? (
+                        <button className="w-full bg-red-600 text-white mt-4 px-4 py-2 rounded-md" disabled>✅ Registered</button>
+                      ) :
+                        (
+                          <button onClick={() => handleRegister(contest)} className="w-full bg-green-600 text-white mt-4 px-4 py-2 rounded-md">Register</button>
+                        )}
                     </div>
                   </div>
                 ))}

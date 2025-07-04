@@ -23,23 +23,34 @@ interface FriendProfile {
   updatedAt: string;
 }
 
+interface Contest {
+  _id: string;
+  name: string;
+  platform: string;
+  startTime: string;
+  endTime: string;
+  url: string;
+}
+
 export default function FriendProfile({ params }: { params: { userId: string } }) {
   const { user } = useUser()
-  const [profile, setProfile] = useState<FriendProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<FriendProfile | null>(null)
+  const [registeredContests, setRegisteredContests] = useState<Contest[]>([])
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetchFriendProfile()
-  }, [params.userId])
+    fetchFriendProfile();
+    fetchRegisteredContests(); // ✅ Now it will load contests too
+  }, [params.userId]);
 
   const fetchFriendProfile = async () => {
     try {
       setLoading(true)
       setError('')
-      
+
       const response = await fetch(`/api/users/${params.userId}`)
-      
+
       if (response.ok) {
         const data = await response.json()
         setProfile(data.data)
@@ -57,6 +68,29 @@ export default function FriendProfile({ params }: { params: { userId: string } }
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchRegisteredContests = async () => {
+    try {
+      const res = await fetch(`/api/users/${params.userId}/registered-contests`)
+      const data = await res.json()
+      if (res.ok) {
+        setRegisteredContests(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch registered contests:', err)
+    }
+  }
+
+  function getDuration(start: string, end: string): string {
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+    const durationMs = endTime.getTime() - startTime.getTime();
+
+    const hours = Math.floor(durationMs / (1000 * 60 * 60));
+    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    return `${hours}h ${minutes}m`;
   }
 
   if (loading) {
@@ -205,6 +239,45 @@ export default function FriendProfile({ params }: { params: { userId: string } }
                     <p className="mt-1 text-sm text-gray-900">
                       {new Date(profile.createdAt).toLocaleDateString()}
                     </p>
+                  </div>
+                  <div className="mt-10">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Contests {profile?.firstName} Registered For</h2>
+                    {registeredContests.length === 0 ? (
+                      <p className="text-gray-600">No registered contests found.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-3">
+                        {registeredContests.map(contest => (
+                          <li key={contest._id} className="border px-4 py-4 pb-2 rounded shadow">
+                            <h1 className="font-semibold text-black text-lg">{contest.name}</h1>
+                            <p className="text-sm text-gray-500">Platform: {contest.platform}</p>
+                            <div className="space-y-2 mb-4">
+                              <div className="flex items-center text-sm text-gray-600">
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="font-medium">Start:</span>
+                                <span className="ml-1">{new Date(contest.startTime).toLocaleString()}</span>
+                              </div>
+                              <div className="flex items-center text-sm text-gray-600">
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="font-medium">Duration:</span>
+                                <span className="ml-1">{getDuration(contest.startTime, contest.endTime)}</span>
+                              </div>
+                            </div>
+                            <a
+                              href={contest.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-center block"
+                            >
+                              View Contest →
+                            </a>
+                          </li>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
