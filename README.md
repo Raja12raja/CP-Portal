@@ -81,28 +81,6 @@ The system now properly handles contest status to prevent registration for past 
 - `GET /api/users/[userId]/registered-contests` - Get user's registered contests
 - `POST /api/users/[userId]/registered-contests` - Register for a contest
 
-## Recent Improvements
-
-### Contest Registration Logic
-1. **Time-based Validation**: Prevents registration for contests that have started or ended
-2. **Visual Status Indicators**: Clear badges showing contest status
-3. **Smart Button States**: Registration buttons are disabled appropriately
-4. **Past Contest Viewing**: Users can view past contests for reference
-5. **Enhanced Error Handling**: Better user feedback for registration attempts
-
-### Problem Sets Dashboard
-1. **Multi-platform Problem Aggregation**: Collects problems from all major platforms
-2. **Advanced Filtering System**: Filter by platform, difficulty, category, tags, and search
-3. **User Progress Tracking**: Track problem-solving status and progress
-4. **Comprehensive Problem Data**: Includes acceptance rates, submission counts, and metadata
-5. **Responsive Problem Cards**: Modern UI with status indicators and action buttons
-
-### User Experience
-- Clear visual distinction between contest states
-- Intuitive registration flow with proper validation
-- Option to view historical contest data
-- Responsive design for all device types
-
 ## Getting Started
 
 1. Clone the repository
