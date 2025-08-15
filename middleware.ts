@@ -5,7 +5,7 @@ export default authMiddleware({
   publicRoutes: ["/", "/api/contests", "/api/problems", "/api/test-db", "/sign-in", "/sign-up"],
   // Routes that can always be accessed, and have
   // no authentication information
-  ignoredRoutes: ["/api/contests/update", "/api/problems/update"],
+  ignoredRoutes: ["/api/contests/update", "/api/problems/update", "/api/cron/test"],
 });
 
 export const config = {

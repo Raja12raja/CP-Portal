@@ -1,4 +1,4 @@
-name: Update Contests
+name: Update
 
 on:
   schedule:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch: # Allows manual trigger
 
 jobs:
-  update-contests:
+  update:
     runs-on: ubuntu-latest
     
     steps:
