@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ContestFetcher } from '../../../../lib/contestFetcher';
 import CronJobService from '../../../../lib/cronJob';
+import { ProblemFetcher } from '../../../../lib/problemFetcher';
 
 export async function GET() {
   try {
@@ -32,6 +33,7 @@ export async function POST(request: NextRequest) {
     
     // Manually trigger contest fetching
     await ContestFetcher.fetchAllContests();
+    await ProblemFetcher.fetchAllProblems();
     
     console.log('=== Manual Fetch Completed ===');
     

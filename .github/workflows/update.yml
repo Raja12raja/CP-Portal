@@ -1,0 +1,39 @@
+name: Update Contests
+
+on:
+  schedule:
+    # Runs every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  update-contests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Update
+      run: |
+        echo "🕐 Starting update at $(date)"
+        echo "🌐 Calling Vercel API..."
+        
+        # Call your Vercel API endpoint
+        RESPONSE=$(curl -s -w "\n%{http_code}" -X POST ${{ secrets.VERCEL_UPDATE_URL }})
+        
+        # Extract response body and status code
+        HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+        RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+        
+        echo "📡 Response Status: $HTTP_STATUS"
+        echo "📄 Response Body: $RESPONSE_BODY"
+        
+        if [ "$HTTP_STATUS" -eq 200 ]; then
+          echo "✅ update completed successfully!"
+        else
+          echo "❌ update failed with status $HTTP_STATUS"
+          exit 1
+        fi
+      
+    - name: Log Update
+      run: |
+        echo "🎯 update workflow completed at $(date)"
+        echo "⏰ Next scheduled run: in 5 minutes"
