@@ -36,7 +36,7 @@ The system now properly handles contest status to prevent registration for past 
 - **Personal Notes**: Add personal notes and custom tags to problems
 - **Performance Metrics**: Track submission counts, best times, and memory usage
 
-### UI Improvements
+### UI
 - **Status Badges**: Visual indicators showing contest status (Upcoming, Live, Ended)
 - **Smart Buttons**: Registration buttons are disabled for past/ongoing contests
 - **Past Contest Toggle**: Option to show/hide past contests for reference
