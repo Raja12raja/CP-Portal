@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '../../../lib/mongodb';
 import Problem from '../../../models/Problem';
+import UserFavorite from '../../../models/UserFavorite';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,6 +19,8 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'asc';
     const premium = searchParams.get('premium');
     const rated = searchParams.get('rated');
+    const favorites = searchParams.get('favorites');
+    const userId = searchParams.get('userId');
 
     let query: any = {};
 
@@ -54,6 +57,12 @@ export async function GET(request: NextRequest) {
     // Filter by rated status
     if (rated !== null && rated !== undefined) {
       query.isRated = rated === 'true';
+    }
+
+    if (favorites === 'true' && userId) {
+      const userFavorites = await UserFavorite.find({ userId }).select('problemId');
+      const favoriteProblemIds = userFavorites.map(fav => fav.problemId);
+      query.problemId = { $in: favoriteProblemIds };
     }
 
     // Build sort object

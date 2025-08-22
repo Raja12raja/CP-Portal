@@ -295,7 +295,7 @@ export default function FriendProfile({ params }: { params: { userId: string } }
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-3">
                         {registeredContests.map(contest => (
-                          <li key={contest._id} className={`border ${darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-200 bg-white'} px-4 py-4 pb-2 rounded shadow`}>
+                          <ul key={contest._id} className={`border ${darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-200 bg-white'} px-4 py-4 pb-2 rounded shadow`}>
                             <h1 className={`font-semibold ${darkMode ? 'text-white' : 'text-black'} text-lg`}>{contest.name}</h1>
                             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Platform: {contest.platform}</p>
                             <div className="space-y-2 mb-4">
@@ -322,7 +322,7 @@ export default function FriendProfile({ params }: { params: { userId: string } }
                             >
                               View Contest →
                             </a>
-                          </li>
+                          </ul>
                         ))}
                       </div>
                     )}
@@ -350,13 +350,13 @@ export default function FriendProfile({ params }: { params: { userId: string } }
                     { key: 'geeksforgeeks', label: 'GeeksforGeeks', color: 'text-green-600', bgColor: darkMode ? 'bg-green-900' : 'bg-green-50', darkColor: 'text-green-400' }
                   ].map((platform) => (
                     <div key={platform.key} className={`flex items-center p-3 rounded-lg ${profile.preferences[platform.key as keyof typeof profile.preferences]
-                        ? platform.bgColor
-                        : darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                      ? platform.bgColor
+                      : darkMode ? 'bg-gray-700' : 'bg-gray-50'
                       }`}>
                       <div className={`h-4 w-4 rounded ${profile.preferences[platform.key as keyof typeof profile.preferences] ? 'bg-green-500' : 'bg-gray-300'}`}></div>
                       <span className={`ml-3 block text-sm font-medium ${profile.preferences[platform.key as keyof typeof profile.preferences]
-                          ? darkMode ? platform.darkColor : platform.color
-                          : darkMode ? 'text-gray-400' : 'text-gray-500'
+                        ? darkMode ? platform.darkColor : platform.color
+                        : darkMode ? 'text-gray-400' : 'text-gray-500'
                         }`}>
                         {platform.label}
                       </span>

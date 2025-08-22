@@ -31,6 +31,7 @@ interface Problem {
   isRated?: boolean
   lastUpdated: string
   userStatus?: 'not_started' | 'attempted' | 'solved' | 'solved_optimally'
+  isFavorite?: boolean
 }
 
 export default function ProblemsDashboard(): JSX.Element {
@@ -49,6 +50,7 @@ export default function ProblemsDashboard(): JSX.Element {
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [showPremium, setShowPremium] = useState<boolean>(true)
   const [showRated, setShowRated] = useState<boolean>(true)
+  const [showFavorites, setShowFavorites] = useState<boolean>(false)
   const [sortBy, setSortBy] = useState<string>('title')
   const [sortOrder, setSortOrder] = useState<string>('asc')
   const [currentPage, setCurrentPage] = useState<number>(1)
@@ -63,7 +65,7 @@ export default function ProblemsDashboard(): JSX.Element {
   // Fetch problems when component mounts or filters change
   useEffect(() => {
     fetchProblems()
-  }, [selectedPlatform, selectedDifficulty, selectedCategory, selectedTag, searchTerm, showPremium, showRated, sortBy, sortOrder, currentPage])
+  }, [selectedPlatform, selectedDifficulty, selectedCategory, selectedTag, searchTerm, showPremium, showRated, showFavorites, sortBy, sortOrder, currentPage])
 
   const fetchProblems = async (): Promise<void> => {
     try {
@@ -92,6 +94,10 @@ export default function ProblemsDashboard(): JSX.Element {
       if (!showRated) {
         params.append('rated', 'false')
       }
+      if (showFavorites && user?.id) {
+        params.append('favorites', 'true')
+        params.append('userId', user.id)
+      }
       params.append('sortBy', sortBy)
       params.append('sortOrder', sortOrder)
       params.append('limit', itemsPerPage.toString())
@@ -104,24 +110,45 @@ export default function ProblemsDashboard(): JSX.Element {
       if (data.success) {
         const problemsData = data.data
 
-        // Fetch user progress if logged in
+        // Fetch user progress and favorites if logged in
         if (user?.id) {
-          const userProblemsRes = await fetch(`/api/users/${user.id}/problems`)
-          const userProblemsData = await userProblemsRes.json()
+          const [userProblemsRes, favoritesRes] = await Promise.all([
+            fetch(`/api/users/${user.id}/problems`),
+            fetch(`/api/users/${user.id}/favorites`)
+          ])
+
+          const [userProblemsData, favoritesData] = await Promise.all([
+            userProblemsRes.json(),
+            favoritesRes.json()
+          ])
+
+          const userProblemsMap = new Map()
+          const favoritesSet = new Set()
 
           if (userProblemsData.success) {
-            const userProblemsMap = new Map(
-              userProblemsData.data.map((up: any) => [up.problemId, up.status])
-            )
-
-            const enriched = problemsData.map((p: Problem) => ({
-              ...p,
-              userStatus: userProblemsMap.get(p.problemId) || 'not_started'
-            }))
-            setProblems(enriched)
-          } else {
-            setProblems(problemsData)
+            userProblemsData.data.forEach((up: any) => {
+              userProblemsMap.set(up.problemId, up.status)
+            })
           }
+
+          if (favoritesData.success) {
+            favoritesData.data.forEach((fav: any) => {
+              favoritesSet.add(fav.problemId)
+            })
+          }
+
+          let enriched = problemsData.map((p: Problem) => ({
+            ...p,
+            userStatus: userProblemsMap.get(p.problemId) || 'not_started',
+            isFavorite: favoritesSet.has(p.problemId)
+          }))
+
+          // Filter favorites on client side if needed
+          if (showFavorites) {
+            enriched = enriched.filter((p: Problem) => p.isFavorite)
+          }
+
+          setProblems(enriched)
         } else {
           setProblems(problemsData)
         }
@@ -165,6 +192,39 @@ export default function ProblemsDashboard(): JSX.Element {
     } catch (err) {
       console.error(err)
       alert('Failed to update problem status.')
+    }
+  }
+
+  const handleFavoriteToggle = async (problemId: string): Promise<void> => {
+    if (!user?.id) return
+
+    try {
+      const problem = problems.find(p => p.problemId === problemId)
+      const isFavorite = problem?.isFavorite || false
+
+      const res = await fetch(`/api/users/${user.id}/favorites`, {
+        method: isFavorite ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ problemId })
+      })
+
+      if (res.ok) {
+        // Update local state
+        setProblems(prev =>
+          prev.map(p => p.problemId === problemId ? { ...p, isFavorite: !isFavorite } : p)
+        )
+
+        // If showing favorites only and item was unfavorited, remove it from view
+        if (showFavorites && isFavorite) {
+          setProblems(prev => prev.filter(p => p.problemId !== problemId))
+        }
+      } else {
+        const data = await res.json()
+        alert(data.error || 'Failed to update favorite status.')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Failed to update favorite status.')
     }
   }
 
@@ -250,6 +310,7 @@ export default function ProblemsDashboard(): JSX.Element {
     setSearchTerm('')
     setShowPremium(true)
     setShowRated(true)
+    setShowFavorites(false)
     setSortBy('title')
     setSortOrder('asc')
     setCurrentPage(1)
@@ -321,6 +382,16 @@ export default function ProblemsDashboard(): JSX.Element {
                   {new Set(problems.map(p => p.platform)).size}
                 </p>
               </div>
+              {user && (
+                <div>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    Favorites
+                  </p>
+                  <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {problems.filter(p => p.isFavorite).length}
+                  </p>
+                </div>
+              )}
               {lastUpdated && (
                 <div>
                   <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
@@ -512,7 +583,7 @@ export default function ProblemsDashboard(): JSX.Element {
             </div>
 
             {/* Toggles */}
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col space-y-2">
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -537,6 +608,20 @@ export default function ProblemsDashboard(): JSX.Element {
                   Show Rated
                 </label>
               </div>
+              {user && (
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="favorites"
+                    checked={showFavorites}
+                    onChange={(e) => setShowFavorites(e.target.checked)}
+                    className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="favorites" className={`ml-2 block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                    Show Favorites ❤️
+                  </label>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -571,9 +656,14 @@ export default function ProblemsDashboard(): JSX.Element {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
-              <p className={darkMode ? 'text-gray-300' : 'text-gray-600'}>No problems found.</p>
+              <p className={darkMode ? 'text-gray-300' : 'text-gray-600'}>
+                {showFavorites ? 'No favorite problems found.' : 'No problems found.'}
+              </p>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
-                Try adjusting your filters or search terms.
+                {showFavorites
+                  ? 'Start favoriting problems by clicking the heart button!'
+                  : 'Try adjusting your filters or search terms.'
+                }
               </p>
             </div>
           ) : (
@@ -591,6 +681,11 @@ export default function ProblemsDashboard(): JSX.Element {
                           </span>
                         </div>
                         <div className="flex items-center space-x-2">
+                          {problem.isFavorite && (
+                            <span className="text-pink-500 text-lg" title="Favorite">
+                              ❤️
+                            </span>
+                          )}
                           {problem.isPremium && (
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${darkMode ? 'bg-purple-800 text-purple-100' : 'bg-purple-100 text-purple-800'}`}>
                               Premium
@@ -600,13 +695,11 @@ export default function ProblemsDashboard(): JSX.Element {
                             <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                               Rated
                             </span>
-                          )
-                          }
-                        </div >
-                      </div >
+                          )}
+                        </div>
+                      </div>
 
                       {/* Problem Title */}
-
                       <h3
                         className={`${darkMode
                           ? 'text-lg text-white font-semibold mb-2 line-clamp-2'
@@ -614,41 +707,37 @@ export default function ProblemsDashboard(): JSX.Element {
                           }`}
                       >
                         {problem.title}
-                      </h3 >
+                      </h3>
 
                       {/* Difficulty and Category */}
-                      < div className="flex items-center space-x-2 mb-3" >
+                      <div className="flex items-center space-x-2 mb-3">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getDifficultyColor(problem.difficulty)}`}>
                           {problem.difficulty}
                         </span>
-                        {
-                          problem.category && (
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
-                              {problem.category}
-                            </span>
-                          )
-                        }
-                      </div >
+                        {problem.category && (
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
+                            {problem.category}
+                          </span>
+                        )}
+                      </div>
 
                       {/* Tags */}
-                      {
-                        problem.tags && problem.tags.length > 0 && (
-                          <div className="mb-3">
-                            <div className="flex flex-wrap gap-1">
-                              {problem.tags.slice(0, 3).map((tag, index) => (
-                                <span key={index} className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
-                                  {tag}
-                                </span>
-                              ))}
-                              {problem.tags.length > 3 && (
-                                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
-                                  +{problem.tags.length - 3}
-                                </span>
-                              )}
-                            </div>
+                      {problem.tags && problem.tags.length > 0 && (
+                        <div className="mb-3">
+                          <div className="flex flex-wrap gap-1">
+                            {problem.tags.slice(0, 3).map((tag, index) => (
+                              <span key={index} className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+                                {tag}
+                              </span>
+                            ))}
+                            {problem.tags.length > 3 && (
+                              <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+                                +{problem.tags.length - 3}
+                              </span>
+                            )}
                           </div>
-                        )
-                      }
+                        </div>
+                      )}
 
                       {/* Stats */}
                       <div className="space-y-2 mb-4">
@@ -673,15 +762,13 @@ export default function ProblemsDashboard(): JSX.Element {
                       </div>
 
                       {/* User Status */}
-                      {
-                        user && (
-                          <div className="mb-4">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(problem.userStatus || 'not_started')}`}>
-                              {getStatusLabel(problem.userStatus || 'not_started')}
-                            </span>
-                          </div>
-                        )
-                      }
+                      {user && (
+                        <div className="mb-4">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(problem.userStatus || 'not_started')}`}>
+                            {getStatusLabel(problem.userStatus || 'not_started')}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Action Buttons */}
                       <div className="space-y-2">
@@ -695,52 +782,67 @@ export default function ProblemsDashboard(): JSX.Element {
                         </a>
 
                         {user && (
-                          <div className="flex space-x-2">
+                          <div className="space-y-2">
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => handleProblemStatusUpdate(problem.problemId, 'attempted')}
+                                className={`flex-1 px-3 py-2 text-sm rounded-md transition-colors ${problem.userStatus === 'attempted'
+                                  ? 'bg-yellow-600 text-white'
+                                  : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                                  }`}
+                              >
+                                Attempted
+                              </button>
+                              <button
+                                onClick={() => handleProblemStatusUpdate(problem.problemId, 'solved')}
+                                className={`flex-1 px-3 py-2 text-sm rounded-md transition-colors ${problem.userStatus === 'solved' || problem.userStatus === 'solved_optimally'
+                                  ? 'bg-green-600 text-white'
+                                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                  }`}
+                              >
+                                Solved
+                              </button>
+                            </div>
+
+                            {/* Favorite Button */}
                             <button
-                              onClick={() => handleProblemStatusUpdate(problem.problemId, 'attempted')}
-                              className={`flex-1 px-3 py-2 text-sm rounded-md transition-colors ${problem.userStatus === 'attempted'
-                                ? 'bg-yellow-600 text-white'
-                                : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                              onClick={() => handleFavoriteToggle(problem.problemId)}
+                              className={`w-full px-3 py-2 text-sm rounded-md transition-colors flex items-center justify-center space-x-2 ${problem.isFavorite
+                                ? 'bg-pink-600 text-white hover:bg-pink-700'
+                                : `${darkMode
+                                  ? 'bg-gray-600 text-gray-200 hover:bg-gray-500'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`
                                 }`}
+                              title={problem.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                             >
-                              Attempted
-                            </button>
-                            <button
-                              onClick={() => handleProblemStatusUpdate(problem.problemId, 'solved')}
-                              className={`flex-1 px-3 py-2 text-sm rounded-md transition-colors ${problem.userStatus === 'solved' || problem.userStatus === 'solved_optimally'
-                                ? 'bg-green-600 text-white'
-                                : 'bg-green-100 text-green-700 hover:bg-green-200'
-                                }`}
-                            >
-                              Solved
+                              <span>{problem.isFavorite ? '❤️' : '🤍'}</span>
+                              <span>{problem.isFavorite ? 'Favorited' : 'Add to Favorites'}</span>
                             </button>
                           </div>
                         )}
                       </div>
-                    </div >
-                  </div >
+                    </div>
+                  </div>
                 ))}
-              </div >
+              </div>
 
               {/* Pagination */}
-              {
-                hasMore && (
-                  <div className="mt-6 flex justify-center">
-                    <button
-                      onClick={() => setCurrentPage(prev => prev + 1)}
-                      disabled={loading}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {loading ? 'Loading...' : 'Load More'}
-                    </button>
-                  </div>
-                )
-              }
-            </div >
-          )
-          }
-        </div >
-      </div >
-    </div >
+              {hasMore && (
+                <div className="mt-6 flex justify-center">
+                  <button
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    disabled={loading}
+                    className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {loading ? 'Loading...' : 'Load More'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   )
-} 
+}
