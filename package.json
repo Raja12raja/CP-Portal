@@ -2,10 +2,11 @@
   "name": "cp-portal",
   "version": "0.1.0",
   "private": true,
+
   "scripts": {
-    "dev": "next dev",
+    "dev": "node server.js",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_ENV=production node server.js",
     "lint": "next lint"
   },
   "dependencies": {
@@ -16,12 +17,15 @@
     "clsx": "^2.0.0",
     "css-select": "^5.2.2",
     "date-fns": "^2.30.0",
+    "engine.io-parser": "^5.0.7",
     "lucide-react": "^0.294.0",
     "mongoose": "^8.0.3",
     "next": "^14.0.4",
     "node-cron": "^3.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "socket.io": "^4.7.4",
+    "socket.io-client": "^4.7.4",
     "svix": "^1.68.0",
     "tailwind-merge": "^2.0.0"
   },
@@ -32,6 +36,7 @@
     "@types/node-cron": "^3.0.11",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
+    "@types/socket.io": "^3.0.1",
     "autoprefixer": "^10.4.21",
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.0.4",

@@ -338,6 +338,9 @@ export default function Dashboard() {
               <Link href="/profile" className={`${themeClasses.textSecondary} hover:text-blue-500 transition-colors font-medium`}>
                 Profile
               </Link>
+              <Link href="/test-socket" className={`${themeClasses.textSecondary} hover:text-blue-500 transition-colors font-medium`}>
+                Test Socket
+              </Link>
               <button
                 onClick={() => setDarkMode(!darkMode)}
                 className={`p-2 rounded-full ${themeClasses.hover} transition-colors duration-200`}
@@ -631,15 +634,23 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      {/* Action Button */}
-                      <a
-                        href={contest.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-center block"
-                      >
-                        View Contest →
-                      </a>
+                      {/* Action Buttons */}
+                      <div className="space-y-2">
+                        <a
+                          href={contest.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-center block"
+                        >
+                          View Contest →
+                        </a>
+                        <Link
+                          href={`/contests/${contest._id}/discussion`}
+                          className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors text-center block"
+                        >
+                          💬 Discussion
+                        </Link>
+                      </div>
                       {(() => {
                         const status = getContestStatus(contest)
                         if (contest.isRegistered) {
