@@ -1,3 +1,4 @@
+// app/api/users/[userId]/registered-contests/route.ts
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb';
 import Contest from '@/models/Contest';

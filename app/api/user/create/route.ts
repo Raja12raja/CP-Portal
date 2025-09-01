@@ -1,3 +1,4 @@
+// app/api/user/create/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import dbConnect from '../../../../lib/mongodb';
@@ -6,10 +7,10 @@ import User from '../../../../models/User';
 export async function POST(request: NextRequest) {
   try {
     console.log('=== User Creation Debug ===');
-    
+
     const { userId } = auth();
     console.log('User ID from auth:', userId);
-    
+
     if (!userId) {
       console.log('No user ID found - user not authenticated');
       return NextResponse.json(
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
       username: user?.username,
       imageUrl: user?.imageUrl
     });
-    
+
     const userDataToSave = {
       clerkId: userId,
       email: user?.emailAddresses?.[0]?.emailAddress || 'unknown@example.com',
@@ -40,31 +41,41 @@ export async function POST(request: NextRequest) {
       lastName: user?.lastName || '',
       username: user?.username || '',
       imageUrl: user?.imageUrl || '',
+      preferences: {
+        emailNotifications: false,
+        reminders: true
+      },
+      userLinks: {
+        codeforces: '',
+        codechef: '',
+        leetcode: ''
+      },
       friends: [],
       friendRequests: {
         sent: [],
         received: []
       }
     };
-    
+
     console.log('Saving user data:', userDataToSave);
-    
+
     // Create or update user in database
     const userData = await User.findOneAndUpdate(
       { clerkId: userId },
       userDataToSave,
       { upsert: true, new: true, lean: true }
     );
-    
+
     console.log('Database operation completed');
     console.log('User data returned:', userData);
-    
+
     if (userData && typeof userData === 'object' && 'email' in userData) {
       console.log('User created/updated successfully:', (userData as any).email);
+      console.log('UserLinks initialized:', (userData as any).userLinks);
     } else {
       console.log('User data is null or invalid');
     }
-    
+
     return NextResponse.json({
       success: true,
       message: 'User created/updated successfully',
@@ -74,6 +85,7 @@ export async function POST(request: NextRequest) {
         email: user?.emailAddresses?.[0]?.emailAddress,
         firstName: user?.firstName,
         lastName: user?.lastName,
+        userLinksInitialized: true,
         timestamp: new Date().toISOString()
       }
     });
@@ -81,10 +93,10 @@ export async function POST(request: NextRequest) {
     console.error('=== User Creation Error ===');
     console.error('Error creating user:', error);
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    
+
     return NextResponse.json(
-      { 
-        error: 'Failed to create user', 
+      {
+        error: 'Failed to create user',
         details: error instanceof Error ? error.message : 'Unknown error',
         debug: {
           timestamp: new Date().toISOString(),
@@ -100,16 +112,16 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   try {
     const { userId } = auth();
-    
+
     if (!userId) {
       return NextResponse.json({
         authenticated: false,
         message: 'Please sign in first'
       });
     }
-    
+
     const user = await currentUser();
-    
+
     return NextResponse.json({
       authenticated: true,
       userId,
@@ -129,4 +141,4 @@ export async function GET() {
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
-} 
+}

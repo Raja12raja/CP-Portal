@@ -38,16 +38,16 @@ export default function ContestDiscussion() {
   const params = useParams()
   const router = useRouter()
   const contestId = params.contestId as string
-  
+
   const [contest, setContest] = useState<Contest | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [isTyping, setIsTyping] = useState(false)
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  
+
   const { socket, isConnected, typingUsers, onlineUsers, sendMessage, startTyping, stopTyping, onNewMessage } = useSocket({
     contestId,
     userId: user?.id,
@@ -154,7 +154,7 @@ export default function ContestDiscussion() {
       if (response.ok) {
         // Get the response data to get the message ID and timestamp
         const responseData = await response.json()
-        
+
         if (responseData.success) {
           // Create a new message object with the response data
           const newMessageObj: ChatMessage = {
@@ -178,7 +178,7 @@ export default function ContestDiscussion() {
               userId: user.id,
               username: messageData.username,
             })
-            
+
             sendMessage(messageData.message);
           } else {
             console.warn('⚠️ Socket not connected, message only saved to database')
@@ -186,7 +186,7 @@ export default function ContestDiscussion() {
         }
 
         setNewMessage('')
-        
+
         // Stop typing indicator
         if (isTyping) {
           setIsTyping(false)
@@ -206,9 +206,9 @@ export default function ContestDiscussion() {
   }
 
   const formatTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
     })
   }
 
@@ -219,16 +219,16 @@ export default function ContestDiscussion() {
     const diffInMinutes = (now.getTime() - date.getTime()) / (1000 * 60);
     const diffInSeconds = (now.getTime() - date.getTime()) / 1000;
     if (diffInSeconds < 1) {
-        return 'Just now'
-      } else if (diffInMinutes < 1) {
-        return `${Math.floor(diffInSeconds)}s ago`
-      } else if (diffInMinutes < 60) {
-        return `${Math.floor(diffInMinutes)}m ago`
-      } else if (diffInHours < 24) {
-        return `${Math.floor(diffInHours)}h ago`
-      } else {
-        return date.toLocaleDateString()
-      }
+      return 'Just now'
+    } else if (diffInMinutes < 1) {
+      return `${Math.floor(diffInSeconds)}s ago`
+    } else if (diffInMinutes < 60) {
+      return `${Math.floor(diffInMinutes)}m ago`
+    } else if (diffInHours < 24) {
+      return `${Math.floor(diffInHours)}h ago`
+    } else {
+      return date.toLocaleDateString()
+    }
   }
 
   if (loading) {
@@ -248,7 +248,7 @@ export default function ContestDiscussion() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Error</h1>
           <p className="text-gray-600 mb-4">{error || 'Contest not found'}</p>
-          <Link 
+          <Link
             href="/contests"
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
           >
@@ -266,7 +266,7 @@ export default function ContestDiscussion() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
-              <Link 
+              <Link
                 href="/contests"
                 className="p-2 rounded-full hover:bg-gray-100 transition-colors"
               >
@@ -290,7 +290,7 @@ export default function ContestDiscussion() {
                 <Users className="h-4 w-4" />
                 <span>{onlineUsers} online</span>
               </div>
-              <Link 
+              <Link
                 href={contest.url}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -310,17 +310,17 @@ export default function ContestDiscussion() {
             <div className="flex items-center space-x-2">
               <Clock className="h-4 w-4 text-gray-500" />
               <span className="text-gray-600">Start:</span>
-              <span className="font-medium">{new Date(contest.startTime).toLocaleString()}</span>
+              <span className="font-medium text-black">{new Date(contest.startTime).toLocaleString()}</span>
             </div>
             <div className="flex items-center space-x-2">
               <Clock className="h-4 w-4 text-gray-500" />
-              <span className="text-gray-600">Duration:</span>
-              <span className="font-medium">{Math.floor(contest.duration / 60)}h {contest.duration % 60}m</span>
+              <span className="text-gray-600 ">Duration:</span>
+              <span className="font-medium text-black">{Math.floor(contest.duration / 60)}h {contest.duration % 60}m</span>
             </div>
             <div className="flex items-center space-x-2">
               <MessageCircle className="h-4 w-4 text-gray-500" />
               <span className="text-gray-600">Messages:</span>
-              <span className="font-medium">{messages.length}</span>
+              <span className="font-medium text-black">{messages.length}</span>
             </div>
           </div>
         </div>
@@ -333,7 +333,7 @@ export default function ContestDiscussion() {
           <div className="h-96 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
-                <MessageCircle className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                <MessageCircle className="h-12 w-12 mx-auto mb-2 text-black" />
                 <p>No messages yet. Start the conversation!</p>
               </div>
             ) : (
@@ -353,28 +353,27 @@ export default function ContestDiscussion() {
                           }}
                         />
                       </div>
-                      
+
                       {/* Message Content */}
                       <div className={`${isOwnMessage ? 'text-right' : 'text-left'}`}>
                         {/* Username and timestamp */}
                         <div className={`flex items-center space-x-2 mb-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-                          <span className={`font-medium text-sm ${isOwnMessage ? 'text-blue-600' : 'text-gray-900'}`}>
+                          <span className={`font-medium text-sm text-black${isOwnMessage ? 'text-blue-600' : 'text-gray-900'}`}>
                             {isOwnMessage ? 'You' : message.username}
                           </span>
                           <span className="text-xs text-gray-500">
                             {formatTime(message.timestamp)}
                           </span>
                         </div>
-                        
+
                         {/* Message bubble */}
-                        <div className={`inline-block px-4 py-2 rounded-lg ${
-                          isOwnMessage 
-                            ? 'bg-blue-600 text-white rounded-br-none' 
-                            : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                        }`}>
-                          <p className="text-sm">{message.message}</p>
+                        <div className={`inline-block px-4 py-2 rounded-lg ${isOwnMessage
+                          ? 'bg-blue-600 text-black rounded-br-none'
+                          : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                          }`}>
+                          <p className="text-sm text-black">{message.message}</p>
                         </div>
-                        
+
                         {/* Date (smaller, below message) */}
                         <div className={`mt-1 ${isOwnMessage ? 'text-right' : 'text-left'}`}>
                           <span className="text-xs text-gray-400">
@@ -387,7 +386,7 @@ export default function ContestDiscussion() {
                 );
               })
             )}
-            
+
             {/* Typing indicators */}
             {typingUsers.length > 0 && (
               typingUsers.map((typingUser) => {
@@ -401,14 +400,13 @@ export default function ContestDiscussion() {
                           <span className="text-xs text-gray-500">...</span>
                         </div>
                       </div>
-                      
+
                       {/* Typing indicator */}
                       <div className={`${isOwnTyping ? 'text-right' : 'text-left'}`}>
-                        <div className={`inline-block px-4 py-2 rounded-lg ${
-                          isOwnTyping 
-                            ? 'bg-blue-600 text-white rounded-br-none' 
-                            : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                        }`}>
+                        <div className={`inline-block px-4 py-2 rounded-lg ${isOwnTyping
+                          ? 'bg-blue-600 text-white rounded-br-none'
+                          : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                          }`}>
                           <div className="flex space-x-1">
                             <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
                             <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -421,7 +419,7 @@ export default function ContestDiscussion() {
                 );
               })
             )}
-            
+
             <div ref={messagesEndRef} />
           </div>
 
@@ -437,7 +435,7 @@ export default function ContestDiscussion() {
                   }}
                   onKeyPress={handleKeyPress}
                   placeholder="Type your message..."
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black resize-none"
                   rows={2}
                   maxLength={1000}
                 />

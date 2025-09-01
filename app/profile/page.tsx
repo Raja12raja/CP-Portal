@@ -1,17 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { UserProfile, useUser } from '@clerk/nextjs'
 import Link from 'next/link'
-import { Moon, Sun } from 'lucide-react'
+import { Moon, Sun, ExternalLink, RefreshCw, BarChart3 } from 'lucide-react'
 
+// Types
 interface UserPreferences {
-  codeforces: boolean;
-  codechef: boolean;
-  leetcode: boolean;
-  geeksforgeeks: boolean;
   emailNotifications: boolean;
   reminders: boolean;
+}
+
+interface UserLinks {
+  codeforces: string;
+  codechef: string;
+  leetcode: string;
 }
 
 interface Friend {
@@ -23,21 +26,88 @@ interface Friend {
   email: string;
 }
 
+interface CodeforcesStats {
+  rating?: number;
+  maxRating?: number;
+  rank?: string;
+  maxRank?: string;
+  contribution?: number;
+  handle?: string;
+}
+
+// Custom hooks
+const useDarkMode = () => {
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('darkMode')
+    if (savedDarkMode) {
+      setDarkMode(JSON.parse(savedDarkMode))
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode))
+    document.documentElement.classList.toggle('dark', darkMode)
+  }, [darkMode])
+
+  return [darkMode, setDarkMode] as const
+}
+
+const useMessage = () => {
+  const [message, setMessage] = useState('')
+
+  const showMessage = useCallback((msg: string) => {
+    setMessage(msg)
+    setTimeout(() => setMessage(''), 5000) // Auto-clear after 5 seconds
+  }, [])
+
+  const clearMessage = useCallback(() => setMessage(''), [])
+
+  return { message, showMessage, clearMessage }
+}
+
+// API functions
+const apiCall = async (endpoint: string, options: RequestInit = {}) => {
+  const response = await fetch(endpoint, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }))
+    throw new Error(errorData.error || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+// Component
 export default function Profile() {
   const { user } = useUser()
-  const [darkMode, setDarkMode] = useState(false)
+  const [darkMode, setDarkMode] = useDarkMode()
+  const { message, showMessage, clearMessage } = useMessage()
+
+  // State
   const [preferences, setPreferences] = useState<UserPreferences>({
-    codeforces: true,
-    codechef: true,
-    leetcode: true,
-    geeksforgeeks: true,
     emailNotifications: false,
     reminders: true
   })
+  const [userLinks, setUserLinks] = useState<UserLinks>({
+    codeforces: '',
+    codechef: '',
+    leetcode: ''
+  })
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
   const [userData, setUserData] = useState<any>(null)
+  const [cfStats, setCfStats] = useState<CodeforcesStats | null>(null)
+  const [cfStatsLoading, setCfStatsLoading] = useState(false)
+  const [cfStatsLastUpdated, setCfStatsLastUpdated] = useState<string | null>(null)
 
   // Friends state
   const [friends, setFriends] = useState<Friend[]>([])
@@ -48,140 +118,105 @@ export default function Profile() {
   const [searching, setSearching] = useState(false)
   const [friendsLoading, setFriendsLoading] = useState(false)
 
-  // Load dark mode preference from localStorage on mount
-  useEffect(() => {
-    const savedDarkMode = localStorage.getItem('darkMode')
-    if (savedDarkMode) {
-      setDarkMode(JSON.parse(savedDarkMode))
-    }
-  }, [])
-
-  // Save dark mode preference to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode))
-  }, [darkMode])
-
-  useEffect(() => {
-    fetchUserData()
-    fetchFriendsData()
-  }, [])
-
-  const fetchUserData = async () => {
+  // Data fetching functions
+  const fetchUserData = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/user')
+      const data = await apiCall('/api/user')
 
-      if (response.ok) {
-        const data = await response.json()
-        console.log('User data:', data)
+      if (data.data) {
+        setUserData(data.data)
+        setPreferences(data.data.preferences || { emailNotifications: false, reminders: true })
 
-        if (data.data) {
-          setUserData(data.data)
-          if (data.data.preferences) {
-            setPreferences(data.data.preferences)
-          }
-        }
-      } else if (response.status === 404) {
-        // User not found in database, create them
-        console.log('User not found, creating user...')
-        await createUser()
-      } else {
-        console.error('Failed to fetch user data:', response.status)
-        setMessage('Failed to load user data')
+        const existingUserLinks = data.data.userLinks || {}
+        setUserLinks({
+          codeforces: existingUserLinks.codeforces || '',
+          codechef: existingUserLinks.codechef || '',
+          leetcode: existingUserLinks.leetcode || ''
+        })
       }
     } catch (error) {
-      console.error('Error fetching user data:', error)
-      setMessage('Error loading user data')
+      if (error instanceof Error && error.message.includes('404')) {
+        await createUser()
+      } else {
+        showMessage('Failed to load user data')
+        console.error('Error fetching user data:', error)
+      }
     } finally {
       setLoading(false)
     }
-  }
+  }, [showMessage])
 
-  const fetchFriendsData = async () => {
+  const fetchFriendsData = useCallback(async () => {
     try {
       setFriendsLoading(true)
-      const response = await fetch('/api/friends')
+      const data = await apiCall('/api/friends')
 
-      if (response.ok) {
-        const data = await response.json()
-        setFriends(data.data.friends || [])
-        setSentRequests(data.data.sentRequests || [])
-        setReceivedRequests(data.data.receivedRequests || [])
-      } else {
-        console.error('Failed to fetch friends data:', response.status)
-      }
+      setFriends(data.data.friends || [])
+      setSentRequests(data.data.sentRequests || [])
+      setReceivedRequests(data.data.receivedRequests || [])
     } catch (error) {
       console.error('Error fetching friends data:', error)
     } finally {
       setFriendsLoading(false)
     }
-  }
+  }, [])
 
   const createUser = async () => {
     try {
-      console.log('Creating user in database...')
-      const response = await fetch('/api/user/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        console.log('User created:', data)
-        setMessage('User created successfully!')
-        // Fetch user data again
-        await fetchUserData()
-      } else {
-        const errorData = await response.json()
-        console.error('Failed to create user:', errorData)
-        setMessage(errorData.error || 'Failed to create user')
-      }
+      await apiCall('/api/user/create', { method: 'POST' })
+      showMessage('User created successfully!')
+      await fetchUserData()
     } catch (error) {
+      showMessage('Error creating user. Please try again.')
       console.error('Error creating user:', error)
-      setMessage('Error creating user. Please try again.')
     }
   }
 
+  // Effects
+  useEffect(() => {
+    fetchUserData()
+    fetchFriendsData()
+  }, [fetchUserData, fetchFriendsData])
+
+  useEffect(() => {
+    if (userLinks.codeforces?.trim() && !cfStats && !cfStatsLoading) {
+      fetchCodeforcesStats(userLinks.codeforces, false)
+    }
+  }, [userLinks.codeforces])
+
+  // Event handlers
   const handlePreferenceChange = (key: keyof UserPreferences, value: boolean) => {
-    setPreferences(prev => ({
-      ...prev,
-      [key]: value
-    }))
-    // Clear any previous messages when user makes changes
-    setMessage('')
+    setPreferences(prev => ({ ...prev, [key]: value }))
+    clearMessage()
+  }
+
+  const handleUserLinkChange = (platform: keyof UserLinks, value: string) => {
+    setUserLinks(prev => ({ ...prev, [platform]: value }))
+    clearMessage()
   }
 
   const savePreferences = async () => {
-    setSaving(true)
-    setMessage('')
-
     try {
-      const response = await fetch('/api/user', {
+      setSaving(true)
+      clearMessage()
+
+      const data = await apiCall('/api/user', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ preferences }),
+        body: JSON.stringify({ preferences, userLinks }),
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        console.log('Preferences saved:', data)
-        setMessage('Preferences saved successfully!')
-        // Update local user data
-        if (data.data) {
-          setUserData(data.data)
+      showMessage('Settings saved successfully!')
+
+      if (data.data) {
+        setUserData(data.data)
+        if (data.data.userLinks) {
+          setUserLinks(data.data.userLinks)
         }
-      } else {
-        const errorData = await response.json()
-        console.error('Failed to save preferences:', errorData)
-        setMessage(errorData.error || 'Failed to save preferences')
       }
     } catch (error) {
+      showMessage('Failed to save settings')
       console.error('Error saving preferences:', error)
-      setMessage('Error saving preferences. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -189,14 +224,67 @@ export default function Profile() {
 
   const resetToDefaults = () => {
     setPreferences({
-      codeforces: true,
-      codechef: true,
-      leetcode: true,
-      geeksforgeeks: true,
       emailNotifications: false,
       reminders: true
     })
-    setMessage('Reset to default preferences')
+    setUserLinks({
+      codeforces: '',
+      codechef: '',
+      leetcode: ''
+    })
+    showMessage('Reset to default preferences')
+  }
+
+  const fetchCodeforcesStats = async (username: string, forceRefresh = false) => {
+    if (!username.trim()) {
+      showMessage('Please enter a valid Codeforces username')
+      return
+    }
+
+    try {
+      setCfStatsLoading(true)
+      showMessage('Fetching Codeforces stats...')
+
+      const url = forceRefresh ? '/api/codeforces-stats' : `/api/codeforces-stats?username=${encodeURIComponent(username)}`
+      const options = forceRefresh ? {
+        method: 'POST',
+        body: JSON.stringify({ username })
+      } : {}
+
+      const data = await apiCall(url, options)
+
+      if (data.success) {
+        setCfStats(data.data)
+        setCfStatsLastUpdated(data.lastUpdated)
+        const cacheStatus = data.cached ? ' (cached)' : ' (fresh data)'
+        showMessage(`Codeforces stats loaded successfully!${cacheStatus}`)
+      } else {
+        throw new Error(data.error || 'Failed to fetch Codeforces stats')
+      }
+    } catch (error) {
+      showMessage('Error fetching Codeforces stats. Please try again.')
+      setCfStats(null)
+      setCfStatsLastUpdated(null)
+      console.error('Error fetching Codeforces stats:', error)
+    } finally {
+      setCfStatsLoading(false)
+    }
+  }
+
+  const openPlatformProfile = (platform: keyof UserLinks) => {
+    const userId = userLinks[platform]
+    if (!userId.trim()) {
+      showMessage(`Please set your ${platform} username first`)
+      return
+    }
+
+    const urls = {
+      codeforces: `https://codeforces.com/profile/${userId}`,
+      codechef: `https://www.codechef.com/users/${userId}`,
+      leetcode: `https://leetcode.com/u/${userId}`
+    }
+
+    window.open(urls[platform], '_blank')
   }
 
   // Friends functions
@@ -207,18 +295,11 @@ export default function Profile() {
       setSearching(true)
       setSearchResult(null)
 
-      const response = await fetch(`/api/users/search?email=${encodeURIComponent(searchEmail)}`)
-
-      if (response.ok) {
-        const data = await response.json()
-        setSearchResult(data.data)
-      } else {
-        const errorData = await response.json()
-        setMessage(errorData.error || 'Failed to search user')
-      }
+      const data = await apiCall(`/api/users/search?email=${encodeURIComponent(searchEmail)}`)
+      setSearchResult(data.data)
     } catch (error) {
+      showMessage('Failed to search user')
       console.error('Error searching user:', error)
-      setMessage('Error searching user')
     } finally {
       setSearching(false)
     }
@@ -226,73 +307,95 @@ export default function Profile() {
 
   const sendFriendRequest = async (targetUserId: string) => {
     try {
-      const response = await fetch('/api/friends', {
+      await apiCall('/api/friends', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ targetUserId }),
       })
 
-      if (response.ok) {
-        setMessage('Friend request sent successfully!')
-        setSearchResult(null)
-        setSearchEmail('')
-        await fetchFriendsData()
-      } else {
-        const errorData = await response.json()
-        setMessage(errorData.error || 'Failed to send friend request')
-      }
+      showMessage('Friend request sent successfully!')
+      setSearchResult(null)
+      setSearchEmail('')
+      await fetchFriendsData()
     } catch (error) {
+      showMessage('Failed to send friend request')
       console.error('Error sending friend request:', error)
-      setMessage('Error sending friend request')
     }
   }
 
   const handleFriendRequest = async (targetUserId: string, action: 'accept' | 'decline') => {
     try {
-      const response = await fetch('/api/friends/requests', {
+      await apiCall('/api/friends/requests', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ targetUserId, action }),
       })
 
-      if (response.ok) {
-        setMessage(`Friend request ${action}ed successfully!`)
-        await fetchFriendsData()
-      } else {
-        const errorData = await response.json()
-        setMessage(errorData.error || `Failed to ${action} friend request`)
-      }
+      showMessage(`Friend request ${action}ed successfully!`)
+      await fetchFriendsData()
     } catch (error) {
+      showMessage(`Failed to ${action} friend request`)
       console.error(`Error ${action}ing friend request:`, error)
-      setMessage(`Error ${action}ing friend request`)
     }
   }
 
   const cancelFriendRequest = async (targetUserId: string) => {
     try {
-      const response = await fetch(`/api/friends/requests?targetUserId=${targetUserId}`, {
+      await apiCall(`/api/friends/requests?targetUserId=${targetUserId}`, {
         method: 'DELETE',
       })
 
-      if (response.ok) {
-        setMessage('Friend request cancelled successfully!')
-        await fetchFriendsData()
-      } else {
-        const errorData = await response.json()
-        setMessage(errorData.error || 'Failed to cancel friend request')
-      }
+      showMessage('Friend request cancelled successfully!')
+      await fetchFriendsData()
     } catch (error) {
+      showMessage('Failed to cancel friend request')
       console.error('Error cancelling friend request:', error)
-      setMessage('Error cancelling friend request')
     }
   }
 
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode)
+  // Render functions
+  const renderCodeforcesStats = () => {
+    if (!cfStats) return null
+
+    return (
+      <div className={`mt-4 p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+        <div className="flex items-center justify-between mb-3">
+          <h4 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            Codeforces Stats
+          </h4>
+          <BarChart3 className={`h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Current Rating</p>
+            <p className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              {cfStats.rating || 'Unrated'}
+            </p>
+          </div>
+          <div>
+            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Max Rating</p>
+            <p className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              {cfStats.maxRating || 'N/A'}
+            </p>
+          </div>
+          <div>
+            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Rank</p>
+            <p className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              {cfStats.rank || 'N/A'}
+            </p>
+          </div>
+          <div>
+            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Max Rank</p>
+            <p className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              {cfStats.maxRank || 'N/A'}
+            </p>
+          </div>
+        </div>
+        {cfStatsLastUpdated && (
+          <p className={`text-xs mt-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            Last updated: {new Date(cfStatsLastUpdated).toLocaleString()}
+          </p>
+        )}
+      </div>
+    )
   }
 
   if (loading) {
@@ -325,7 +428,7 @@ export default function Profile() {
                 </div>
               )}
               <button
-                onClick={toggleDarkMode}
+                onClick={() => setDarkMode(!darkMode)}
                 className={`p-2 rounded-md ${darkMode ? 'bg-gray-700 text-yellow-400 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} transition-colors`}
                 aria-label="Toggle dark mode"
               >
@@ -335,6 +438,29 @@ export default function Profile() {
           </div>
         </div>
       </header>
+
+      {/* Message */}
+      {message && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className={`p-4 rounded-md border ${message.includes('successfully') || message.includes('Reset')
+            ? (darkMode ? 'bg-green-900 text-green-200 border-green-700' : 'bg-green-50 text-green-800 border-green-200')
+            : (darkMode ? 'bg-red-900 text-red-200 border-red-700' : 'bg-red-50 text-red-800 border-red-200')
+            }`}>
+            <div className="flex items-center">
+              {message.includes('successfully') || message.includes('Reset') ? (
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              )}
+              {message}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -366,32 +492,79 @@ export default function Profile() {
                       <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Email</label>
                       <p className={`mt-1 text-sm ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>{user.primaryEmailAddress?.emailAddress}</p>
                     </div>
+                  </div>
 
-                    <div>
-                      <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Full Name</label>
-                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
-                        {user.firstName} {user.lastName}
-                      </p>
+                  {/* Platform Links */}
+                  <div className="pt-4">
+                    <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>Platform Profiles</h3>
+                    <div className="space-y-3">
+                      {Object.entries({
+                        codeforces: { name: 'Codeforces', color: 'red' },
+                        codechef: { name: 'CodeChef', color: 'orange' },
+                        leetcode: { name: 'LeetCode', color: 'yellow' }
+                      }).map(([platform, config]) => (
+                        <button
+                          key={platform}
+                          onClick={() => openPlatformProfile(platform as keyof UserLinks)}
+                          disabled={!userLinks[platform as keyof UserLinks]?.trim()}
+                          className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${userLinks[platform as keyof UserLinks]?.trim()
+                            ? darkMode
+                              ? `bg-${config.color}-900 border-${config.color}-700 hover:bg-${config.color}-800 text-${config.color}-100`
+                              : `bg-${config.color}-50 border-${config.color}-200 hover:bg-${config.color}-100 text-${config.color}-800`
+                            : darkMode
+                              ? 'bg-gray-700 border-gray-600 text-gray-400 cursor-not-allowed'
+                              : 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+                            }`}
+                        >
+                          <span>{config.name} Profile</span>
+                          {userLinks[platform as keyof UserLinks]?.trim() && <ExternalLink className="h-4 w-4" />}
+                        </button>
+                      ))}
                     </div>
 
-                    <div>
-                      <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>User ID</label>
-                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} font-mono`}>{user.id}</p>
-                    </div>
+                    {/* Codeforces Stats Section */}
+                    {userLinks.codeforces?.trim() && (
+                      <div className="mt-4 space-y-3">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => fetchCodeforcesStats(userLinks.codeforces, false)}
+                            disabled={cfStatsLoading}
+                            className={`flex-1 px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-center ${darkMode
+                              ? 'bg-blue-700 hover:bg-blue-600 text-blue-100 border border-blue-600'
+                              : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200'
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            {cfStatsLoading ? (
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                Loading...
+                              </>
+                            ) : (
+                              'Load Stats'
+                            )}
+                          </button>
 
-                    <div>
-                      <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Account Created</label>
-                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
-                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Last Sign In</label>
-                      <p className={`mt-1 text-sm ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
-                        {user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleDateString() : 'Unknown'}
-                      </p>
-                    </div>
+                          <button
+                            onClick={() => fetchCodeforcesStats(userLinks.codeforces, true)}
+                            disabled={cfStatsLoading}
+                            className={`flex-1 px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-center ${darkMode
+                              ? 'bg-green-700 hover:bg-green-600 text-green-100 border border-green-600'
+                              : 'bg-green-50 hover:bg-green-100 text-green-700 border border-green-200'
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            {cfStatsLoading ? (
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                Refreshing...
+                              </>
+                            ) : (
+                              'Refresh Stats'
+                            )}
+                          </button>
+                        </div>
+                        {renderCodeforcesStats()}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -418,9 +591,10 @@ export default function Profile() {
                       placeholder="Enter friend's email"
                       value={searchEmail}
                       onChange={(e) => setSearchEmail(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && searchUser()}
                       className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode
-                          ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                          : 'bg-white border-gray-300 text-black placeholder-gray-500'
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                        : 'bg-white border-gray-300 text-black placeholder-gray-500'
                         }`}
                     />
                     <button
@@ -461,7 +635,9 @@ export default function Profile() {
               {/* Friend Requests */}
               {receivedRequests.length > 0 && (
                 <div>
-                  <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>Friend Requests ({receivedRequests.length})</h3>
+                  <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>
+                    Friend Requests ({receivedRequests.length})
+                  </h3>
                   <div className="space-y-3">
                     {receivedRequests.map((request) => (
                       <div key={request.clerkId} className={`p-3 rounded-lg ${darkMode ? 'bg-blue-900' : 'bg-blue-50'}`}>
@@ -501,7 +677,9 @@ export default function Profile() {
               {/* Sent Requests */}
               {sentRequests.length > 0 && (
                 <div>
-                  <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>Sent Requests ({sentRequests.length})</h3>
+                  <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>
+                    Sent Requests ({sentRequests.length})
+                  </h3>
                   <div className="space-y-3">
                     {sentRequests.map((request) => (
                       <div key={request.clerkId} className={`p-3 rounded-lg ${darkMode ? 'bg-yellow-900' : 'bg-yellow-50'}`}>
@@ -532,7 +710,9 @@ export default function Profile() {
 
               {/* Friends List */}
               <div>
-                <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>My Friends ({friends.length})</h3>
+                <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>
+                  My Friends ({friends.length})
+                </h3>
                 {friendsLoading ? (
                   <div className="text-center py-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
@@ -564,46 +744,53 @@ export default function Profile() {
                     ))}
                   </div>
                 ) : (
-                  <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>No friends yet. Search for users to add them as friends!</p>
+                  <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    No friends yet. Search for users to add them as friends!
+                  </p>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Preferences */}
+          {/* Preferences and User Links */}
           <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow`}>
             <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
-              <h2 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Preferences</h2>
+              <h2 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Settings</h2>
               <button
                 onClick={resetToDefaults}
-                className={`text-sm ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
+                className={`text-sm ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'} transition-colors`}
               >
                 Reset to Defaults
               </button>
             </div>
             <div className="p-6 space-y-6">
-              {/* Platform Preferences */}
+              {/* User Links */}
               <div>
-                <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>Platform Preferences</h3>
-                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>Select which platforms you want to see contests from:</p>
-                <div className="space-y-3">
+                <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>Platform Usernames</h3>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>
+                  Add your usernames for each platform to access your profiles:
+                </p>
+                <div className="space-y-4">
                   {[
-                    { key: 'codeforces' as keyof UserPreferences, label: 'Codeforces', color: 'text-red-600', bgColor: darkMode ? 'bg-red-900' : 'bg-red-50' },
-                    { key: 'codechef' as keyof UserPreferences, label: 'CodeChef', color: 'text-orange-600', bgColor: darkMode ? 'bg-orange-900' : 'bg-orange-50' },
-                    { key: 'leetcode' as keyof UserPreferences, label: 'LeetCode', color: 'text-yellow-600', bgColor: darkMode ? 'bg-yellow-900' : 'bg-yellow-50' },
-                    { key: 'geeksforgeeks' as keyof UserPreferences, label: 'GeeksforGeeks', color: 'text-green-600', bgColor: darkMode ? 'bg-green-900' : 'bg-green-50' }
-                  ].map((platform) => (
-                    <div key={platform.key} className={`flex items-center p-3 rounded-lg ${preferences[platform.key] ? platform.bgColor : (darkMode ? 'bg-gray-700' : 'bg-gray-50')}`}>
-                      <input
-                        type="checkbox"
-                        id={platform.key}
-                        checked={preferences[platform.key]}
-                        onChange={(e) => handlePreferenceChange(platform.key, e.target.checked)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor={platform.key} className={`ml-3 block text-sm font-medium ${platform.color}`}>
-                        {platform.label}
+                    { key: 'codeforces', label: 'Codeforces Username', placeholder: 'Your Codeforces username' },
+                    { key: 'codechef', label: 'CodeChef Username', placeholder: 'Your CodeChef username' },
+                    { key: 'leetcode', label: 'LeetCode Username', placeholder: 'Your LeetCode username' }
+                  ].map(({ key, label, placeholder }) => (
+                    <div key={key}>
+                      <label htmlFor={key} className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                        {label}
                       </label>
+                      <input
+                        type="text"
+                        id={key}
+                        placeholder={placeholder}
+                        value={userLinks[key as keyof UserLinks]}
+                        onChange={(e) => handleUserLinkChange(key as keyof UserLinks, e.target.value)}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${darkMode
+                          ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                          : 'bg-white border-gray-300 text-black placeholder-gray-500'
+                          }`}
+                      />
                     </div>
                   ))}
                 </div>
@@ -612,9 +799,11 @@ export default function Profile() {
               {/* Notification Preferences */}
               <div>
                 <h3 className={`text-md font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-4`}>Notification Preferences</h3>
-                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>Choose how you want to be notified about contests:</p>
+                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>
+                  Choose how you want to be notified about contests:
+                </p>
                 <div className="space-y-3">
-                  <div className={`flex items-center p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <div className={`flex items-center p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} transition-colors`}>
                     <input
                       type="checkbox"
                       id="emailNotifications"
@@ -626,7 +815,7 @@ export default function Profile() {
                       Email notifications for new contests
                     </label>
                   </div>
-                  <div className={`flex items-center p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <div className={`flex items-center p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} transition-colors`}>
                     <input
                       type="checkbox"
                       id="reminders"
@@ -641,29 +830,8 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Message */}
-              {message && (
-                <div className={`p-4 rounded-md border ${message.includes('successfully') || message.includes('Reset')
-                    ? (darkMode ? 'bg-green-900 text-green-200 border-green-700' : 'bg-green-50 text-green-800 border-green-200')
-                    : (darkMode ? 'bg-red-900 text-red-200 border-red-700' : 'bg-red-50 text-red-800 border-red-200')
-                  }`}>
-                  <div className="flex items-center">
-                    {message.includes('successfully') || message.includes('Reset') ? (
-                      <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                    {message}
-                  </div>
-                </div>
-              )}
-
               {/* Save Button */}
-              <div className="pt-4 space-y-3">
+              <div className="pt-4">
                 <button
                   onClick={savePreferences}
                   disabled={saving}
@@ -675,7 +843,7 @@ export default function Profile() {
                       Saving...
                     </div>
                   ) : (
-                    'Save Preferences'
+                    'Save Settings'
                   )}
                 </button>
               </div>

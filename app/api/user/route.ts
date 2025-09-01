@@ -6,7 +6,7 @@ import User from '../../../models/User';
 export async function GET(request: NextRequest) {
   try {
     const { userId } = auth();
-    
+
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     await dbConnect();
     console.log(userId);
     const user = await User.findOne({ clerkId: userId }).lean();
-    
+
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const { userId } = auth();
-    
+
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -50,22 +50,42 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { preferences } = body;
+    const { preferences, userLinks } = body;
 
     await dbConnect();
-    
+
+    // Build update object dynamically
+    const updateData: any = {};
+
+    if (preferences) {
+      updateData.preferences = preferences;
+    }
+
+    if (userLinks) {
+      // Ensure userLinks are properly trimmed and saved
+      updateData.userLinks = {
+        codeforces: userLinks.codeforces?.trim() || '',
+        codechef: userLinks.codechef?.trim() || '',
+        leetcode: userLinks.leetcode?.trim() || '',
+      };
+    }
+
+    console.log('Updating user with data:', updateData);
+
     const updatedUser = await User.findOneAndUpdate(
       { clerkId: userId },
-      { preferences },
-      { new: true, lean: true }
+      updateData,
+      { new: true, lean: true, upsert: false }
     );
-    
+
     if (!updatedUser) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       );
     }
+
+    console.log('Updated user:', updatedUser);
 
     return NextResponse.json({
       success: true,
@@ -78,4 +98,4 @@ export async function PUT(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

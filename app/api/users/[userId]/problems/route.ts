@@ -1,3 +1,4 @@
+// app/api/users/[userId]/problems/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import UserProblem from '@/models/UserProblem';
@@ -53,9 +54,9 @@ export async function GET(
       };
     });
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      data: enrichedProblems 
+      data: enrichedProblems
     });
   } catch (err) {
     console.error('Error fetching user problems:', err);
@@ -110,9 +111,9 @@ export async function POST(
       { upsert: true, new: true }
     );
 
-    return NextResponse.json({ 
-      success: true, 
-      data: userProblem 
+    return NextResponse.json({
+      success: true,
+      data: userProblem
     });
   } catch (err) {
     console.error('Error updating user problem:', err);

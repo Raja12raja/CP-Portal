@@ -1,95 +1,105 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import dbConnect from '../../../../lib/mongodb';
-import User, { IUser } from '../../../../models/User';
+// app/api/users/[userId]/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import dbConnect from "@/lib/mongodb";
+import User, { IUser } from "@/models/User";
 
-// GET - Get user profile (only for friends)
 export async function GET(
   request: NextRequest,
   { params }: { params: { userId: string } }
 ) {
   try {
     const { userId: currentUserId } = auth();
-    
+
     if (!currentUserId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const targetUserId = params.userId;
-
     if (!targetUserId) {
       return NextResponse.json(
-        { error: 'User ID is required' },
+        { error: "User ID is required" },
         { status: 400 }
       );
     }
 
-    // Users can always view their own profile
-    if (currentUserId === targetUserId) {
+    try {
       await dbConnect();
-      const user = await User.findOne({ clerkId: targetUserId }).lean();
-      
-      if (!user) {
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        data: user,
-        isOwnProfile: true
-      });
-    }
-
-    await dbConnect();
-
-    // Check if current user is friends with target user
-    const currentUser = await User.findOne({ clerkId: currentUserId }) as IUser | null;
-    if (!currentUser || !currentUser.friends?.includes(targetUserId)) {
+    } catch (dbError) {
+      console.error("Database connection failed:", dbError);
       return NextResponse.json(
-        { error: 'You can only view profiles of your friends' },
-        { status: 403 }
+        { error: "Database unavailable" },
+        { status: 503 }
       );
     }
 
-    // Get target user's profile (limited information for friends)
-    const targetUser = await User.findOne({ clerkId: targetUserId }).lean() as IUser | null;
-    
+    // ✅ Properly typed queries
+    const [currentUser, targetUser] = await Promise.all([
+      User.findOne({ clerkId: currentUserId }).lean<IUser>().exec(),
+      User.findOne({ clerkId: targetUserId }).lean<IUser>().exec(),
+    ]);
+
     if (!targetUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // If viewing own profile
+    if (currentUserId === targetUserId) {
+      return NextResponse.json({
+        success: true,
+        data: targetUser,
+        isOwnProfile: true,
+      });
+    }
+
+    if (!currentUser) {
       return NextResponse.json(
-        { error: 'User not found' },
+        { error: "Current user not found" },
         { status: 404 }
       );
     }
 
-    // Return limited profile information for friends
+    // ✅ Type-safe friendship check
+    const areFriends = currentUser.friends.includes(targetUserId);
+
+    if (!areFriends) {
+      return NextResponse.json(
+        { error: "You can only view profiles of your friends" },
+        { status: 403 }
+      );
+    }
+
+    // ✅ Type-safe friend profile response
     const friendProfile = {
       clerkId: targetUser.clerkId,
       firstName: targetUser.firstName,
       lastName: targetUser.lastName,
       username: targetUser.username,
       imageUrl: targetUser.imageUrl,
-      email: targetUser.email,
-      preferences: targetUser.preferences,
+      preferences: {
+        codeforces: targetUser.preferences.codeforces,
+        codechef: targetUser.preferences.codechef,
+        leetcode: targetUser.preferences.leetcode,
+        geeksforgeeks: targetUser.preferences.geeksforgeeks,
+        emailNotifications: targetUser.preferences.emailNotifications,
+        reminders: targetUser.preferences.reminders,
+      },
+      userLinks: targetUser.userLinks,
+      codeforcesStats: targetUser.codeforcesStats ?? null,
       createdAt: targetUser.createdAt,
-      updatedAt: targetUser.updatedAt
+      updatedAt: targetUser.updatedAt,
     };
 
     return NextResponse.json({
       success: true,
       data: friendProfile,
-      isOwnProfile: false
+      isOwnProfile: false,
     });
   } catch (error) {
-    console.error('Error fetching user profile:', error);
+    console.error("Error fetching user profile:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch user profile' },
+      { error: "Failed to fetch user profile" },
       { status: 500 }
     );
   }
-} 
+}
